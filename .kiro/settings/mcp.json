@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hello-agent": {
+      "url": "http://localhost:8000/mcp"
+    },
+    "alp-agent-starter": {
+      "type": "http",
+      "url": "https://alp-agent-starter.onrender.com/mcp"
+    }
+  }
+}
