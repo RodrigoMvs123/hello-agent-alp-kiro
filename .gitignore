@@ -1,12 +1,14 @@
+# Environment
 .env
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-dist/
-*.egg-info/
-Lib/
-Scripts/
-hello-agent-alp-kiro/
+
+# Virtual environment
 .venv12/
+
+# Python site‑packages (installed libraries)
+Lib/site-packages/
+
+# Scripts folder (executable wrappers)
+Scripts/
+
+# Python executable used for the project
+python312.exe
