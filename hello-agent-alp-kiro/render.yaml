@@ -18,4 +18,4 @@ services:
       - key: SERPER_API_KEY
         sync: false
       - key: SEED_KNOWLEDGE_DB
-        value: false
+        value: "false"
