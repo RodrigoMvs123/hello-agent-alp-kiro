@@ -1,0 +1,116 @@
+[
+  {
+    "id": "alp-overview",
+    "category": "overview",
+    "question": "What is ALP?",
+    "answer": "ALP stands for Agent Load Protocol. It is an open, MCP-compatible format for describing complete AI agents as a single portable artifact called the Agent Card (agent.alp.json). What MCP is to tools, ALP is to entire agents. ALP defines how an AI agent — its identity, tools, memory, and LLM preference — is packaged, served, and loaded across any runtime or platform."
+  },
+  {
+    "id": "alp-agent-card",
+    "category": "core-concepts",
+    "question": "What is an Agent Card?",
+    "answer": "An Agent Card is a JSON file named agent.alp.json that fully describes a complete agent. It declares the agent identity (id, name, description), persona (system prompt), tools (MCP-compatible endpoints), memory configuration, LLM preference, and server URL. It is the central artifact of ALP — portable, public-safe, and never contains secrets."
+  },
+  {
+    "id": "alp-alp-server",
+    "category": "core-concepts",
+    "question": "What is an ALP Server?",
+    "answer": "An ALP Server is a server that hosts and exposes an Agent Card and its tools. It must expose these endpoints: GET /agent (returns the Agent Card), GET /persona (returns the system prompt), GET /tools (returns the tool list), POST /tools/{name} (executes a tool), GET /health (status check), and GET /mcp + POST /mcp for MCP SSE transport. The reference implementation is in Python using FastAPI."
+  },
+  {
+    "id": "alp-mcp-relation",
+    "category": "core-concepts",
+    "question": "How does ALP relate to MCP?",
+    "answer": "ALP is MCP-compatible at the tool layer. Tool endpoints follow MCP conventions so any MCP-compatible host (Kiro, Claude Code, Claude Desktop, VS Code, Cursor) can call ALP tools. ALP extends MCP by adding the Agent Card layer: identity, persona, memory, and LLM routing. MCP exposes tools only. ALP describes the whole agent and tells the runtime where to find the MCP-compatible tool endpoints."
+  },
+  {
+    "id": "alp-secrets",
+    "category": "security",
+    "question": "How does ALP handle secrets and API keys?",
+    "answer": "API keys and secrets must never appear in the Agent Card. The agent.alp.json file is always public-safe. Secrets live only in environment variables on the ALP Server. Tools reference credentials by name using the auth_ref field (e.g. auth_ref: serper_api_key) — never the actual value. In the GitHub-native pattern, secrets are stored as GitHub Secrets and injected by GitHub Actions at deploy time."
+  },
+  {
+    "id": "alp-runtime-deploy",
+    "category": "v0.9.0",
+    "question": "What is the runtime.deploy block?",
+    "answer": "The runtime.deploy block is new in ALP v0.9.0. It declares how the agent is deployed and what credentials it requires. It has three fields: trigger (github_actions, manual, or none), workflow (path to the GitHub Actions workflow file), and credentials (array of credential references with ref, description, and source). The source can be github_secrets, user_supplied, or oidc. Secret values are never stored in this block — only references."
+  },
+  {
+    "id": "alp-github-native",
+    "category": "v0.9.0",
+    "question": "What is the GitHub-native agent pattern?",
+    "answer": "The GitHub-native agent pattern (introduced in ALP v0.9.0) means the agent lives entirely in a GitHub repository. The agent card is agent.alp.json in the repo root. Secrets are stored as GitHub Secrets (never in the card). Deployment is triggered automatically via GitHub Actions workflow_dispatch. The user loads the agent in Kiro by pointing at the GitHub repo URL. GitHub authentication is the only authentication needed."
+  },
+  {
+    "id": "alp-versions",
+    "category": "versions",
+    "question": "What are the main ALP versions and what did each add?",
+    "answer": "ALP v0.1.0 was the initial release with the Agent Card, ALP Server, and Python reference implementation. v0.2.0 added agent_type, capabilities, observability, and marketplace blocks. v0.3.0 added toolsets, security/read-only mode, and dynamic tool discovery. v0.4.0 added GET /persona, GET /agents, and the Node.js reference server. v0.5.0 added proxy tool execution and MCP SSE transport. v0.6.0 added remote card loading via AGENT_CARD_URL and multi-agent manifests. v0.7.0 added pip install alp-server as a drop-in middleware library. v0.9.0 added the GitHub-native agent pattern with the runtime.deploy block."
+  },
+  {
+    "id": "alp-tools",
+    "category": "core-concepts",
+    "question": "How are tools defined in ALP?",
+    "answer": "Tools are defined in the tools array of the Agent Card. Each tool requires name, description, and endpoint. Optional fields include input_schema (JSON Schema for inputs), output_schema (JSON Schema for outputs), readonly (true if the tool makes no mutations), auth_ref (credential reference name), auth (OAuth scopes), deprecated, aliases, steps (internal pipeline), and description_override_key (env var to override description at load time)."
+  },
+  {
+    "id": "alp-proxy",
+    "category": "v0.5.0",
+    "question": "What is proxy tool execution?",
+    "answer": "Proxy tool execution (introduced in ALP v0.5.0) means that when a tool endpoint in agent.alp.json is a full URL (e.g. https://their-server.com/api/search), the ALP Server forwards the call to that URL via HTTP instead of executing locally. The ALP Server POSTs the input to that URL and returns the result. Relative endpoints (/tools/search) execute locally. Full URL endpoints (https://...) are proxied. The remote agent needs zero MCP or SSE code."
+  },
+  {
+    "id": "alp-library",
+    "category": "v0.7.0",
+    "question": "How do I use alp-server as a Python library?",
+    "answer": "Install with pip install alp-server. For FastAPI: import ALPRouter from alp, create alp = ALPRouter(card_path='agent.alp.json'), then call app.include_router(alp.router). For Flask: import ALPBlueprint from alp.flask, create alp = ALPBlueprint(card_path='agent.alp.json'), then call app.register_blueprint(alp.blueprint). Use the @alp.tool() decorator to register local Python functions as tool handlers."
+  },
+  {
+    "id": "alp-persona",
+    "category": "core-concepts",
+    "question": "What is the persona field in ALP?",
+    "answer": "The persona field is the system prompt and identity of the agent. It is required in every Agent Card. It is public-safe — it is not a secret. Any runtime that loads the agent fetches it from GET /persona and injects it as the LLM system prompt before registering tools. This ensures the agent behaves consistently regardless of which runtime loads it."
+  },
+  {
+    "id": "alp-llm",
+    "category": "core-concepts",
+    "question": "How does ALP handle LLM provider selection?",
+    "answer": "ALP is LLM-agnostic. The llm field in the Agent Card declares a preference with provider (any, openai, anthropic, google, mistral, ollama) and an optional model. The ALP Client resolves the final LLM based on: the user's explicit choice first, then the Agent Card preference, then the client default. ALP does not prescribe an LLM — the preference can be overridden by the runtime."
+  },
+  {
+    "id": "alp-memory",
+    "category": "core-concepts",
+    "question": "How does ALP handle memory?",
+    "answer": "Memory in ALP is declared in the memory block of the Agent Card with enabled (boolean) and backend (string) fields. When enabled is false, the agent has no persistent memory between sessions. When enabled is true, the backend field specifies the memory provider (e.g. hive-internal). The memory block is optional and defaults to disabled."
+  },
+  {
+    "id": "alp-kiro",
+    "category": "runtimes",
+    "question": "How do I load an ALP agent in Kiro?",
+    "answer": "To load an ALP agent in Kiro, add the MCP endpoint to .kiro/settings/mcp.json: { mcpServers: { my-agent: { url: 'http://localhost:8000/mcp' } } }. For the GitHub-native pattern, connect GitHub MCP in Kiro (one-time OAuth), then say: 'Load my agent from github.com/YOUR-USERNAME/YOUR-REPO'. Kiro reads agent.alp.json via get_file_contents, triggers the deploy workflow via workflow_dispatch, and connects to /mcp."
+  },
+  {
+    "id": "alp-get-agent-card",
+    "category": "future",
+    "question": "What is get_agent_card?",
+    "answer": "get_agent_card is a proposed new tool for the GitHub MCP Server (github/github-mcp-server issue #2299). It would read an agent.alp.json file from any GitHub repository and return it as a parsed, schema-validated JSON object — instead of the raw base64 blob returned by get_file_contents today. It would replace one manual step in the Kiro loading flow and make the runtime.deploy block immediately actionable without any parsing."
+  },
+  {
+    "id": "alp-sep2127",
+    "category": "standards",
+    "question": "How does ALP relate to SEP-2127 MCP Server Cards?",
+    "answer": "SEP-2127 is an active MCP specification for pre-connection server discovery via .well-known/mcp/server-card.json. ALP v0.9.0 is a superset of SEP-2127 — the server_card block in the ALP schema implements all SEP-2127 fields. ALP answers several open questions in SEP-2127: tools[] inclusion, dynamic vs static primitives, Agent Card vs Server Card relationship, and discovery without .well-known control. The live ALP reference server implements all of this today."
+  },
+  {
+    "id": "alp-deploy-render",
+    "category": "deployment",
+    "question": "How do I deploy an ALP agent to Render?",
+    "answer": "Create a render.yaml file at the repo root declaring a web service with runtime python, buildCommand pip install -r requirements.txt, and startCommand uvicorn server:app --host 0.0.0.0 --port $PORT. Add GEMINI_API_KEY as an environment variable in the Render dashboard (sync: false so it is never committed). Connect the GitHub repo in Render and it will auto-deploy on push. The health check path should be /health."
+  },
+  {
+    "id": "alp-hello-agent",
+    "category": "examples",
+    "question": "What is hello-agent-alp-kiro?",
+    "answer": "hello-agent-alp-kiro is the ALP v0.9.0 starter agent — a minimal reference implementation of the GitHub-native agent pattern. It lives at github.com/RodrigoMvs123/hello-agent-alp-kiro and is live at https://hello-agent-alp-kiro.onrender.com. It exposes 5 tools via MCP: greet (greet a user by name), echo (echo back text), get_agent_card (return the full ALP Agent Card JSON), chat (send a message to Gemini and get a response), and search_knowledge (semantic search over the ALP knowledge base). It uses Google Gemini as the LLM provider and deploys automatically to Render via GitHub Actions."
+  }
+]

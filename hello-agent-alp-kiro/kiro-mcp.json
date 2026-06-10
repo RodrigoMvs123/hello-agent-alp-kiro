@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "hello-agent": {
+      "url": "https://hello-agent-alp-kiro.onrender.com/mcp"
+    }
+  }
+}

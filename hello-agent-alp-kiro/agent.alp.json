@@ -1,0 +1,331 @@
+{
+  "$schema": "https://raw.githubusercontent.com/RodrigoMvs123/agent-load-protocol/main/schema/agent.alp.schema.json",
+  "alp_version": "0.9.0",
+  "id": "hello-agent",
+  "name": "Hello Agent",
+  "description": "A minimal ALP-compliant agent that greets users, echoes input, reports its own card, and chats via Gemini. Deploys automatically via GitHub Actions.",
+  "persona": "You are a friendly, helpful agent built with the Agent Load Protocol. You greet users by name, echo back what they say, and can describe yourself by returning your own Agent Card.",
+  "agent_type": "single",
+  "llm": {
+    "provider": "google",
+    "model": "gemini-2.5-flash"
+  },
+  "tools": [
+    {
+      "name": "greet",
+      "description": "Greet a user by name.",
+      "endpoint": "/tools/greet",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the person to greet."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "echo",
+      "description": "Echo back any text the user sends.",
+      "endpoint": "/tools/echo",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to echo."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "echo": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "get_agent_card",
+      "description": "Return this agent's own ALP Agent Card as JSON.",
+      "endpoint": "/tools/get_agent_card",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "chat",
+      "description": "Send a message to the Gemini-powered AI and get a response. Use this to answer any question or have a conversation.",
+      "endpoint": "/tools/chat",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The message or question to send to the AI."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "reply": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "search_knowledge",
+      "description": "Search the ALP knowledge base using semantic search. Use this to answer any question about the Agent Load Protocol, ALP concepts, versions, tools, deployment, and how ALP works. Input: a natural language query. Returns the most relevant knowledge entries with answers.",
+      "endpoint": "/tools/search_knowledge",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The question or topic to search for in the ALP knowledge base."
+          },
+          "top_k": {
+            "type": "integer",
+            "description": "Number of results to return. Defaults to 3.",
+            "default": 3
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id":       { "type": "string" },
+                "category": { "type": "string" },
+                "question": { "type": "string" },
+                "answer":   { "type": "string" },
+                "score":    { "type": "number" }
+              }
+            }
+          },
+          "count": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Search the live web for current information, news, and real-time data using Serper (Google Search API).",
+      "endpoint": "/tools/web_search",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query to look up on the web."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of results to return. Defaults to 5.",
+            "default": 5
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title":       { "type": "string" },
+                "url":         { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "count": { "type": "integer" },
+          "query": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "remember",
+      "description": "Store a key-value memory for the current session. Use this whenever the user mentions something important — a topic, a decision, a preference, a project name — that should be recalled later in the same conversation.",
+      "endpoint": "/tools/remember",
+      "readonly": false,
+      "input_schema": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+          "session_id": { "type": "string", "description": "Unique session identifier. Use 'default' if none is provided." },
+          "key": { "type": "string", "description": "Short label for this memory, e.g. 'current_project', 'user_goal', 'tech_stack'." },
+          "value": { "type": "string", "description": "The value to store for this key." }
+        }
+      }
+    },
+    {
+      "name": "recall",
+      "description": "Retrieve a stored memory by key. If no key is given, returns all memories for the session. Use this before answering questions that depend on earlier context in the conversation.",
+      "endpoint": "/tools/recall",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Unique session identifier. Use 'default' if none is provided." },
+          "key": { "type": "string", "description": "The key to retrieve. Omit to get all stored memories." }
+        }
+      }
+    },
+    {
+      "name": "forget",
+      "description": "Delete a specific memory key from the session, or clear all memories if no key is given.",
+      "endpoint": "/tools/forget",
+      "readonly": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Unique session identifier. Use 'default' if none is provided." },
+          "key": { "type": "string", "description": "The key to delete. Omit to clear the entire session." }
+        }
+      }
+    },
+    {
+      "name": "search_knowledge_db",
+      "description": "Semantic search over the knowledge base in Supabase (pgvector). Covers ALP docs, transcribed audio, and transcribed video. Same query interface as search_knowledge.",
+      "endpoint": "/tools/search_knowledge_db",
+      "readonly": true,
+      "input_schema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The question or topic to search for in the knowledge base."
+          },
+          "top_k": {
+            "type": "integer",
+            "description": "Number of results to return. Defaults to 3.",
+            "default": 3
+          },
+          "filter_source": {
+            "type": "string",
+            "description": "Optional filter by source type: 'audio', 'video', or any custom source_type."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "results": { "type": "array" },
+          "count": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "ingest_media",
+      "description": "Ingest an audio or video file into the knowledge base. Transcribes with Groq Whisper, chunks, embeds with Gemini, stores in Supabase. Supports .mp3 .wav .m4a .ogg .flac .mp4 .mov .avi .mkv .webm",
+      "endpoint": "/tools/ingest_media",
+      "readonly": false,
+      "input_schema": {
+        "type": "object",
+        "required": ["file_path"],
+        "properties": {
+          "file_path": {
+            "type": "string",
+            "description": "Absolute path to the uploaded media file on the server."
+          },
+          "source_name": {
+            "type": "string",
+            "description": "Human-readable label for search results. Defaults to filename."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "status":          { "type": "string" },
+          "chunks_ingested": { "type": "integer" },
+          "source_id":       { "type": "string" },
+          "error":           { "type": "string" }
+        }
+      }
+    }
+  ],
+  "memory": { "enabled": false },
+  "runtime": {
+    "deploy": {
+      "trigger": "github_actions",
+      "workflow": ".github/workflows/deploy.yml",
+      "credentials": [
+        {
+          "ref": "GEMINI_API_KEY",
+          "description": "Google Gemini API key for the LLM (free quota available at aistudio.google.com)",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "RENDER_API_KEY",
+          "description": "Render deploy API key",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "RENDER_SERVICE_ID",
+          "description": "Render service ID (visible in the Render dashboard URL)",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "SUPABASE_URL",
+          "description": "Supabase project URL",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "SUPABASE_KEY",
+          "description": "Supabase anon or service role key",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "GROQ_API_KEY",
+          "description": "Groq API key for Whisper transcription (free at console.groq.com)",
+          "source": "github_secrets"
+        },
+        {
+          "ref": "SERPER_API_KEY",
+          "description": "Serper Google Search API key (free tier at serper.dev)",
+          "source": "github_secrets"
+        }
+      ]
+    }
+  },
+  "server": {
+    "url": "https://hello-agent-alp-kiro.onrender.com",
+    "transport": "http",
+    "channel": "stable"
+  },
+  "observability": {
+    "websocket": false,
+    "logs_endpoint": "/logs"
+  },
+  "metadata": {
+    "author": "RodrigoMvs123",
+    "version": "1.4.0",
+    "tags": ["hello-agent", "github-native", "auto-deploy", "alp", "gemini", "web-search", "serper", "session-memory", "supabase", "pgvector", "groq", "whisper", "media-ingestion"],
+    "repository": "https://github.com/RodrigoMvs123/hello-agent-alp-kiro"
+  }
+}
