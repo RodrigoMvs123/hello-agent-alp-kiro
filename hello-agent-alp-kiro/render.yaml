@@ -1,16 +1,16 @@
 services:
   - type: web
     name: hello-agent-alp-kiro
-    runtime: python # (or python-3.12 if you want to lock the version)
-    buildCommand: apt-get update && apt-get install -y ffmpeg libsndfile1 && pip install --upgrade pip setuptools wheel && pip install -r hello-agent-alp-kiro/requirements.txt
-    startCommand: uvicorn hello-agent-alp-kiro.server:app --host 0.0.0.0 --port $PORT
+    runtime: python
+    buildCommand: apt-get update && apt-get install -y ffmpeg libsndfile1 && pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
       - key: AGENT_CARD_PATH
-        value: hello-agent-alp-kiro/agent.alp.json
+        value: agent.alp.json
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
