@@ -241,7 +241,7 @@
     },
     {
       "name": "ingest_media",
-      "description": "Ingest an audio or video file into the knowledge base. Transcribes with Groq Whisper, chunks, embeds with Gemini, stores in Supabase. Supports .mp3 .wav .m4a .ogg .flac .mp4 .mov .avi .mkv .webm",
+      "description": "Ingest an audio or video file into the knowledge base. Transcribes with Groq Whisper, chunks, embeds with Gemini, stores in Supabase. Supports local file paths OR public URLs (Google Drive, tmpfiles.org, direct links). Formats: .mp3 .wav .m4a .ogg .flac .mp4 .mov .avi .mkv .webm",
       "endpoint": "/tools/ingest_media",
       "readonly": false,
       "input_schema": {
@@ -250,7 +250,7 @@
         "properties": {
           "file_path": {
             "type": "string",
-            "description": "Absolute path to the uploaded media file on the server."
+            "description": "Absolute path to the uploaded media file on the server, OR a public HTTPS URL to download from."
           },
           "source_name": {
             "type": "string",
@@ -324,8 +324,8 @@
   },
   "metadata": {
     "author": "RodrigoMvs123",
-    "version": "1.4.0",
-    "tags": ["hello-agent", "github-native", "auto-deploy", "alp", "gemini", "web-search", "serper", "session-memory", "supabase", "pgvector", "groq", "whisper", "media-ingestion"],
+    "version": "1.5.0",
+    "tags": ["hello-agent", "github-native", "auto-deploy", "alp", "gemini", "web-search", "serper", "session-memory", "supabase", "pgvector", "groq", "whisper", "media-ingestion", "file-upload", "url-ingestion"],
     "repository": "https://github.com/RodrigoMvs123/hello-agent-alp-kiro"
   }
 }
