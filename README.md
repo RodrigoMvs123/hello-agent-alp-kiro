@@ -57,12 +57,17 @@ Two-stage chunking pipeline for audio and video files:
 
 **Stage 2 — Semantic chunking (stored in DB)**
 - Splits transcript into 400-word chunks with 50-word overlap
-- Each chunk embedded with Gemini and upserted into Supabase
+- Each chunk embedded with Gemini (`gemini-embedding-001`, 3072 dims) and upserted into Supabase
 
 **Supported formats:** `.mp3` `.wav` `.m4a` `.ogg` `.flac` `.mp4` `.mov` `.avi` `.mkv` `.webm`
 
 ```bash
-# Example: ingest an audio file
+# Example: ingest from a public URL or Google Drive share link
+curl -X POST http://localhost:8000/ingest-url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://drive.google.com/file/d/FILE_ID/view", "source_name": "My Video"}'
+
+# Example: ingest a local file via tool
 curl -X POST http://localhost:8000/tools/ingest_media \
   -H "Content-Type: application/json" \
   -d '{"input": {"file_path": "/tmp/recording.mp3", "source_name": "My Recording"}}'
@@ -71,7 +76,6 @@ curl -X POST http://localhost:8000/tools/ingest_media \
 curl -X POST http://localhost:8000/tools/search_knowledge_db \
   -H "Content-Type: application/json" \
   -d '{"input": {"query": "what did the speaker say about agents?"}}'
-```
 
 ---
 
@@ -95,20 +99,23 @@ Go to your repo: **Settings → Secrets and variables → Actions → New reposi
 | `RENDER_SERVICE_ID` | Render service ID — visible in the Render dashboard URL |
 | `SERPER_API_KEY` | Serper API key — free at [serper.dev](https://serper.dev) (2,500 free queries) |
 | `SUPABASE_URL` | Supabase project URL — Project Settings → API |
-| `SUPABASE_KEY` | Supabase anon key — Project Settings → API |
+| `SUPABASE_KEY` | Supabase service_role key — Project Settings → API (use service_role, not anon, to bypass RLS) |
 | `GROQ_API_KEY` | Groq API key — free at [console.groq.com](https://console.groq.com) |
 
 ### Step 3 — Set up Supabase (for `search_knowledge_db` and `ingest_media`)
 
 1. Create a free project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** → paste the contents of `db/migrations/001_knowledge.sql` → Run
-3. Copy `Project URL` and `anon` key from **Project Settings → API**
+   - Schema uses `vector(3072)` to match `gemini-embedding-001` output dimensions
+   - No ivfflat/hnsw index — both are limited to 2000 dims max; sequential scan used instead
+3. In a new SQL query, run: `ALTER TABLE knowledge_chunks DISABLE ROW LEVEL SECURITY;`
+4. Copy `Project URL` and `service_role` key from **Project Settings → API**
 
 ### Step 4 — Create the Render service
 
 1. Go to [render.com](https://render.com) → New → Web Service
 2. Connect your GitHub repo
-3. Render detects `render.yaml` automatically (includes `ffmpeg` install)
+3. Render uses the `Dockerfile` which installs `ffmpeg` and all dependencies automatically
 4. Add all environment variables in the Render dashboard
 5. Copy the service ID from the URL → add as `RENDER_SERVICE_ID` GitHub Secret
 
@@ -173,6 +180,8 @@ Server starts at **http://localhost:8000** — open the dashboard for all links.
 | `GET /agents` | All hosted agent cards |
 | `GET /tools` | Tool list (Claude Code / Claude Desktop) |
 | `POST /tools/{name}` | Execute any of the 11 tools |
+| `POST /upload` | Upload audio/video file directly (multipart/form-data) |
+| `POST /ingest-url` | Ingest audio/video from a public URL or Google Drive share link |
 | `GET /mcp` | MCP SSE stream (Kiro) |
 | `POST /mcp` | MCP JSON-RPC receiver (Kiro) |
 | `POST /chat` | Gemini chat API |
