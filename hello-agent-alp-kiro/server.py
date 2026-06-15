@@ -521,67 +521,51 @@ TOOLS: dict[str, dict] = {
 async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
     """
     Shared ingestion pipeline:
-    1. Transcribe audio/video with Groq Whisper
+    1. Transcribe audio/video with _transcribe_media (handles chunking for large files)
     2. Chunk the transcript
     3. Embed each chunk with Gemini
-    4. Store in Supabase pgvector table
-    Returns a summary dict.
+    4. Store in Supabase via _upsert_chunks
     """
-    import math
-
-    # --- Step 1: Transcribe with Groq Whisper ---
-    groq_client = groq.Groq(api_key=os.environ.get("GROQ_API_KEY"))
-    with open(file_path, "rb") as f:
-        transcription = groq_client.audio.transcriptions.create(
-            model="whisper-large-v3",
-            file=(os.path.basename(file_path), f),
-            response_format="text"
-        )
-    transcript_text = transcription if isinstance(transcription, str) else transcription.text
+    # --- Step 1: Transcribe (handles video extraction + large file splitting) ---
+    transcript_text = await _transcribe_media(file_path)
 
     if not transcript_text.strip():
         return {"status": "error", "error": "Transcription returned empty text"}
 
-    # --- Step 2: Chunk the transcript (500 chars with 50 char overlap) ---
-    chunk_size = 500
-    overlap = 50
-    chunks = []
-    start = 0
-    while start < len(transcript_text):
-        end = min(start + chunk_size, len(transcript_text))
-        chunks.append(transcript_text[start:end])
-        start += chunk_size - overlap
+    # --- Step 2: Semantic chunk (400 words, 50 word overlap) ---
+    text_chunks = _split_into_chunks(transcript_text, chunk_words=400, overlap_words=50)
 
-    # --- Step 3: Embed each chunk with Gemini ---
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+    source_id = os.path.basename(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
+    source_type = "audio" if ext in {".mp3", ".wav", ".m4a", ".ogg", ".flac"} else "video"
 
-    supabase_client = supabase.create_client(
-        os.environ.get("SUPABASE_URL"),
-        os.environ.get("SUPABASE_KEY")
-    )
-
-    ingested = 0
-    for i, chunk in enumerate(chunks):
-        embedding_result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=chunk,
-            task_type="retrieval_document"
-        )
-        embedding_vector = embedding_result["embedding"]
-
-        supabase_client.table("knowledge").insert({
-            "content": chunk,
-            "embedding": embedding_vector,
-            "source": source_name,
-            "source_type": "video",
-            "chunk_index": i
-        }).execute()
-        ingested += 1
+    # --- Step 3: Embed and upsert in batches of 10 ---
+    BATCH = 10
+    total = 0
+    for batch_start in range(0, len(text_chunks), BATCH):
+        batch = text_chunks[batch_start: batch_start + BATCH]
+        rows = []
+        for i, chunk_text in enumerate(batch):
+            global_idx = batch_start + i
+            embedding = await _embed_text(chunk_text, task_type="RETRIEVAL_DOCUMENT")
+            rows.append({
+                "chunk_id":    f"{source_id}_{global_idx}",
+                "source_type": source_type,
+                "source_id":   source_id,
+                "source_name": source_name,
+                "chunk_index": global_idx,
+                "text":        chunk_text,
+                "metadata":    {"chunk_index": global_idx, "total_chunks": len(text_chunks)},
+                "embedding":   embedding
+            })
+        await _upsert_chunks(rows)
+        total += len(rows)
 
     return {
         "status": "ok",
         "source_name": source_name,
-        "chunks_ingested": ingested,
+        "chunks_ingested": total,
+        "source_id": source_id,
         "transcript_preview": transcript_text[:300] + ("..." if len(transcript_text) > 300 else "")
     }
 
