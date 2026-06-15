@@ -476,6 +476,8 @@ async def _upsert_chunks(rows: list[dict]) -> None:
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, headers=headers, json=rows, timeout=30.0)
+        if not resp.is_success:
+            _log("error", f"Supabase upsert error {resp.status_code}: {resp.text}")
         resp.raise_for_status()
 
 
