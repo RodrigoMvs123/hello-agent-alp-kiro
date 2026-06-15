@@ -1,8 +1,6 @@
--- Enable pgvector extension
+-- Enable pgvector
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Universal knowledge chunks table
--- One row = one semantic chunk from any source type (json, audio, video)
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     chunk_id      TEXT PRIMARY KEY,
     source_type   TEXT NOT NULL,
@@ -11,26 +9,21 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     chunk_index   INTEGER NOT NULL,
     text          TEXT NOT NULL,
     metadata      JSONB DEFAULT '{}',
-    embedding     vector(768),
+    embedding     vector(3072),
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- IVFFlat index for fast cosine similarity search
-CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx
-    ON knowledge_chunks
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 10);
+-- No vector index — sequential scan works fine for small datasets
+-- (Both ivfflat and hnsw are limited to 2000 dims max)
 
--- Indexes for filtering by source type and source id
 CREATE INDEX IF NOT EXISTS knowledge_chunks_source_type_idx
     ON knowledge_chunks (source_type);
 
 CREATE INDEX IF NOT EXISTS knowledge_chunks_source_id_idx
     ON knowledge_chunks (source_id);
 
--- RPC function called by search_knowledge_db tool
 CREATE OR REPLACE FUNCTION match_knowledge(
-    query_embedding   vector(768),
+    query_embedding   vector(3072),
     match_count       int   DEFAULT 3,
     filter_source     text  DEFAULT NULL
 )
