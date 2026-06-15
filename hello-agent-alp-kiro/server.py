@@ -642,12 +642,12 @@ async def ingest_from_url(request: Request):
             content={"status": "error", "error": "Missing 'url' in request body"}
         )
 
-    # Handle Google Drive share links → convert to direct download URL
+    # Handle Google Drive share links → extract file ID
+    gdrive_file_id = None
     if "drive.google.com" in url and "/file/d/" in url:
-        file_id = url.split("/file/d/")[1].split("/")[0]
-        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        gdrive_file_id = url.split("/file/d/")[1].split("/")[0]
 
-    # Derive label and extension from URL
+    # Derive label and extension from original URL (before rewriting)
     url_path = url.split("?")[0]
     original_filename = url_path.split("/")[-1] or "download"
     ext = os.path.splitext(original_filename)[1].lower() or ".mp4"
@@ -656,9 +656,34 @@ async def ingest_from_url(request: Request):
     # Download the file
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            file_bytes = response.content
+            if gdrive_file_id:
+                import re
+                # Use drive.usercontent.google.com (current Google Drive download endpoint)
+                dl_url = f"https://drive.usercontent.google.com/download?id={gdrive_file_id}&export=download&authuser=0&confirm=t"
+                response = await client.get(dl_url, headers={"User-Agent": "Mozilla/5.0"})
+                # If redirected to sign-in page, the file is not publicly shared
+                ct = response.headers.get("content-type", "")
+                if "text/html" in ct:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"status": "error", "error": "Google Drive file is not publicly shared. Set sharing to 'Anyone with the link can view' and try again."}
+                    )
+                response.raise_for_status()
+                file_bytes = response.content
+                # Use content-disposition filename if available
+                cd = response.headers.get("content-disposition", "")
+                m = re.search(r"filename\*?=['\"]*(UTF-8'')?([^;\"]+)", cd, re.IGNORECASE)
+                if m:
+                    cd_name = m.group(2).strip().strip('"')
+                    cd_ext = os.path.splitext(cd_name)[1].lower()
+                    if cd_ext:
+                        ext = cd_ext
+                    if not source_name:
+                        label = os.path.splitext(cd_name)[0]
+            else:
+                response = await client.get(url)
+                response.raise_for_status()
+                file_bytes = response.content
     except Exception as e:
         return JSONResponse(
             status_code=400,
