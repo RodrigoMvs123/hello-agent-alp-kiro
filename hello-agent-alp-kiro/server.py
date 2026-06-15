@@ -40,6 +40,7 @@ import asyncio
 import json
 import os
 import logging
+import re
 import subprocess
 import tempfile
 import uuid
@@ -657,7 +658,6 @@ async def ingest_from_url(request: Request):
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
             if gdrive_file_id:
-                import re
                 # Use drive.usercontent.google.com (current Google Drive download endpoint)
                 dl_url = f"https://drive.usercontent.google.com/download?id={gdrive_file_id}&export=download&authuser=0&confirm=t"
                 response = await client.get(dl_url, headers={"User-Agent": "Mozilla/5.0"})
@@ -698,6 +698,9 @@ async def ingest_from_url(request: Request):
     try:
         result = await run_ingestion_pipeline(tmp_path, label)
         return JSONResponse(content=result)
+    except Exception as e:
+        _log("error", f"ingest-url pipeline error: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
