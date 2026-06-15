@@ -289,9 +289,9 @@ def _tool_forget(input_data: dict) -> dict:
 
 
 async def _embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
-    """Embed a single text string using Gemini embedding model."""
+    """Embed a single text string using Gemini text-embedding-004 (768 dims)."""
     result = genai.embed_content(
-        model=EMBEDDING_MODEL, content=text, task_type=task_type
+        model="models/text-embedding-004", content=text, task_type=task_type
     )
     return result["embedding"]
 
