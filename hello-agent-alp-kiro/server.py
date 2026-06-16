@@ -481,22 +481,90 @@ async def _upsert_chunks(rows: list[dict]) -> None:
         resp.raise_for_status()
 
 
+async def _download_url_to_tempfile(url: str, source_name: str) -> tuple[str, str, str]:
+    """
+    Download a URL to a temp file. Handles Google Drive share links.
+    Returns (tmp_path, ext, label).
+    Raises on any download failure with a descriptive message.
+    """
+    gdrive_file_id = None
+    if "drive.google.com" in url and "/file/d/" in url:
+        gdrive_file_id = url.split("/file/d/")[1].split("/")[0]
+
+    url_path = url.split("?")[0]
+    original_filename = url_path.split("/")[-1] or "download"
+    ext = os.path.splitext(original_filename)[1].lower() or ".mp4"
+    label = source_name or os.path.splitext(original_filename)[0]
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
+        if gdrive_file_id:
+            dl_url = f"https://drive.usercontent.google.com/download?id={gdrive_file_id}&export=download&authuser=0&confirm=t"
+            _log("info", f"Downloading Google Drive file id={gdrive_file_id}")
+            response = await client.get(dl_url, headers={"User-Agent": "Mozilla/5.0"})
+            ct = response.headers.get("content-type", "")
+            if "text/html" in ct:
+                raise RuntimeError("Google Drive file is not publicly shared. Set sharing to 'Anyone with the link can view' and try again.")
+            response.raise_for_status()
+            file_bytes = response.content
+            cd = response.headers.get("content-disposition", "")
+            m = re.search(r"filename\*?=['\"]*(UTF-8'')?([^;\"]+)", cd, re.IGNORECASE)
+            if m:
+                cd_name = m.group(2).strip().strip('"')
+                cd_ext = os.path.splitext(cd_name)[1].lower()
+                if cd_ext:
+                    ext = cd_ext
+                if not source_name:
+                    label = os.path.splitext(cd_name)[0]
+        else:
+            _log("info", f"Downloading URL: {url}")
+            response = await client.get(url)
+            response.raise_for_status()
+            file_bytes = response.content
+
+    _log("info", f"Downloaded {len(file_bytes)} bytes, ext={ext}")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+    return tmp_path, ext, label
+
+
 async def tool_ingest_media(input_data: dict) -> dict:
     """
     Ingest an audio or video file into the knowledge base.
+    Accepts a local file path OR a public HTTPS URL (including Google Drive share links).
     Input:  { file_path, source_name (optional) }
     Output: { status, chunks_ingested, source_id }
     """
-    file_path = input_data.get("file_path", "")
-    source_name = input_data.get("source_name") or os.path.basename(file_path)
+    file_path = input_data.get("file_path", "").strip()
+    source_name = input_data.get("source_name", "").strip()
 
     if not file_path:
         return {"status": "error", "error": "Missing file_path argument"}
-    elif not os.path.exists(file_path):
+
+    # Handle remote URLs
+    if file_path.startswith("http://") or file_path.startswith("https://"):
+        tmp_path = None
+        try:
+            tmp_path, _, label = await _download_url_to_tempfile(file_path, source_name)
+            return await run_ingestion_pipeline(tmp_path, label)
+        except Exception as e:
+            _log("error", f"ingest_media URL download error: {type(e).__name__}: {e}")
+            return {"status": "error", "error": f"Download failed: {type(e).__name__}: {e}"}
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    # Handle local file path
+    if not os.path.exists(file_path):
+        _log("error", f"ingest_media: local file not found: {file_path}")
         return {"status": "error", "error": f"File not found: {file_path}"}
-    else:
-        result = await run_ingestion_pipeline(file_path, source_name)
-        return result
+
+    try:
+        label = source_name or os.path.basename(file_path)
+        return await run_ingestion_pipeline(file_path, label)
+    except Exception as e:
+        _log("error", f"ingest_media pipeline error: {type(e).__name__}: {e}")
+        return {"status": "error", "error": f"Ingestion failed: {type(e).__name__}: {e}"}
 
 
 TOOLS: dict[str, dict] = {
@@ -629,57 +697,14 @@ async def ingest_from_url(request: Request):
             content={"status": "error", "error": "Missing 'url' in request body"}
         )
 
-    # Handle Google Drive share links → extract file ID
-    gdrive_file_id = None
-    if "drive.google.com" in url and "/file/d/" in url:
-        gdrive_file_id = url.split("/file/d/")[1].split("/")[0]
-
-    # Derive label and extension from original URL (before rewriting)
-    url_path = url.split("?")[0]
-    original_filename = url_path.split("/")[-1] or "download"
-    ext = os.path.splitext(original_filename)[1].lower() or ".mp4"
-    label = source_name or os.path.splitext(original_filename)[0]
-
-    # Download the file
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
-            if gdrive_file_id:
-                # Use drive.usercontent.google.com (current Google Drive download endpoint)
-                dl_url = f"https://drive.usercontent.google.com/download?id={gdrive_file_id}&export=download&authuser=0&confirm=t"
-                response = await client.get(dl_url, headers={"User-Agent": "Mozilla/5.0"})
-                # If redirected to sign-in page, the file is not publicly shared
-                ct = response.headers.get("content-type", "")
-                if "text/html" in ct:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"status": "error", "error": "Google Drive file is not publicly shared. Set sharing to 'Anyone with the link can view' and try again."}
-                    )
-                response.raise_for_status()
-                file_bytes = response.content
-                # Use content-disposition filename if available
-                cd = response.headers.get("content-disposition", "")
-                m = re.search(r"filename\*?=['\"]*(UTF-8'')?([^;\"]+)", cd, re.IGNORECASE)
-                if m:
-                    cd_name = m.group(2).strip().strip('"')
-                    cd_ext = os.path.splitext(cd_name)[1].lower()
-                    if cd_ext:
-                        ext = cd_ext
-                    if not source_name:
-                        label = os.path.splitext(cd_name)[0]
-            else:
-                response = await client.get(url)
-                response.raise_for_status()
-                file_bytes = response.content
+        tmp_path, ext, label = await _download_url_to_tempfile(url, source_name)
     except Exception as e:
+        _log("error", f"ingest-url download error: {type(e).__name__}: {e}")
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "error": f"Failed to download file: {str(e)}"}
+            content={"status": "error", "error": f"Failed to download file: {type(e).__name__}: {e}"}
         )
-
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
 
     try:
         result = await run_ingestion_pipeline(tmp_path, label)
