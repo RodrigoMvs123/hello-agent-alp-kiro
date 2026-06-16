@@ -487,6 +487,11 @@ async def _download_url_to_tempfile(url: str, source_name: str) -> tuple[str, st
     Returns (tmp_path, ext, label).
     Raises on any download failure with a descriptive message.
     """
+    # Auto-rewrite tmpfiles.org viewer links to direct download
+    if "tmpfiles.org" in url and "/dl/" not in url:
+        url = url.replace("tmpfiles.org/", "tmpfiles.org/dl/", 1)
+        _log("info", f"tmpfiles.org URL rewritten to direct download: {url}")
+
     gdrive_file_id = None
     if "drive.google.com" in url and "/file/d/" in url:
         gdrive_file_id = url.split("/file/d/")[1].split("/")[0]
