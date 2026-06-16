@@ -519,6 +519,13 @@ async def _download_url_to_tempfile(url: str, source_name: str) -> tuple[str, st
             _log("info", f"Downloading URL: {url}")
             response = await client.get(url)
             response.raise_for_status()
+            ct = response.headers.get("content-type", "")
+            if "text/html" in ct:
+                # e.g. tmpfiles.org viewer page instead of /dl/ direct link
+                raise RuntimeError(
+                    f"URL returned an HTML page instead of a media file. "
+                    f"Use a direct download link (e.g. tmpfiles.org/dl/... instead of tmpfiles.org/...)"
+                )
             file_bytes = response.content
 
     _log("info", f"Downloaded {len(file_bytes)} bytes, ext={ext}")
