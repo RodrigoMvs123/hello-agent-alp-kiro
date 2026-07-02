@@ -42,40 +42,47 @@ hello-agent-alp-kiro/
 | 7 | `remember` | Store a key-value memory for the current session |
 | 8 | `recall` | Retrieve a stored memory by key (or all memories for the session) |
 | 9 | `forget` | Delete a specific memory key or clear the entire session |
-| 10 | `search_knowledge_db` | Semantic search over Supabase (pgvector) — covers ALP docs, audio, and video |
-| 11 | `ingest_media` | Transcribe audio/video with Groq Whisper, chunk, embed with Gemini, store in Supabase |
+| 10 | `search_knowledge_db` | Semantic search over Supabase (pgvector) — covers all ingested content |
+| 11 | `ingest_media` | **Analyzer pipeline** — routes by file type: audio/video → Whisper, PDF → pdfplumber, DOCX → python-docx, image → Gemini Vision, text/md → direct read. Chunks, embeds, stores in Supabase. |
 
 ---
 
-## Media Ingestion Pipeline (`ingest_media`)
+## Multi-Modal Analyzer Pipeline (`ingest_media`) — v2.0.0
 
-Two-stage chunking pipeline for audio and video files:
+Every file type goes through **Input → Classify → Extract → Chunk → Embed → Store**.
 
-**Stage 1 — API size chunking (Whisper limit)**
-- Splits audio into 10-minute segments with 30s overlap using `pydub`
-- Temp files stored in `/tmp`, deleted after transcription
+| File Type | Extension(s) | Extractor |
+|---|---|---|
+| Audio | `.mp3 .wav .m4a .ogg .flac` | Groq Whisper (direct if ≤24MB, pydub-split if larger) |
+| Video | `.mp4 .mov .avi .mkv .webm` | ffmpeg extracts audio → Groq Whisper |
+| PDF | `.pdf` | `pdfplumber` (per-page text) |
+| Word | `.docx` | `python-docx` (paragraphs + tables) |
+| Image | `.jpg .jpeg .png .webp` | Gemini Vision (OCR + description) |
+| Plain text | `.txt .md` | direct read |
 
-**Stage 2 — Semantic chunking (stored in DB)**
-- Splits transcript into 400-word chunks with 50-word overlap
-- Each chunk embedded with Gemini (`gemini-embedding-001`, 3072 dims) and upserted into Supabase
-
-**Supported formats:** `.mp3` `.wav` `.m4a` `.ogg` `.flac` `.mp4` `.mov` `.avi` `.mkv` `.webm`
+After extraction, all content is split into **400-word chunks with 50-word overlap**, embedded with Gemini, and upserted into Supabase `knowledge_chunks`.
 
 ```bash
-# Example: ingest from a public URL or Google Drive share link
-curl -X POST http://localhost:8000/ingest-url \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://drive.google.com/file/d/FILE_ID/view", "source_name": "My Video"}'
-
-# Example: ingest a local file via tool
+# Ingest a PDF
 curl -X POST http://localhost:8000/tools/ingest_media \
   -H "Content-Type: application/json" \
-  -d '{"input": {"file_path": "/tmp/recording.mp3", "source_name": "My Recording"}}'
+  -d '{"input": {"file_path": "/tmp/report.pdf", "source_name": "Q1 Report"}}'
 
-# Example: search the ingested content
+# Ingest a video from Google Drive
+curl -X POST http://localhost:8000/ingest-url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://drive.google.com/file/d/FILE_ID/view", "source_name": "Demo Video"}'
+
+# Search all ingested content
 curl -X POST http://localhost:8000/tools/search_knowledge_db \
   -H "Content-Type: application/json" \
   -d '{"input": {"query": "what did the speaker say about agents?"}}'
+```
+
+Adding a new file type later only requires:
+1. A new `extract_*` function
+2. One entry in `classify_file()`
+3. One entry in the `EXTRACTORS` dict
 
 ---
 

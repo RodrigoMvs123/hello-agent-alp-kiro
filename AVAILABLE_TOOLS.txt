@@ -1,0 +1,531 @@
+================================================================================
+                    HELLO-AGENT-ALP-KIRO - ALL AVAILABLE TOOLS
+================================================================================
+
+Project: hello-agent-alp-kiro
+Repository: https://github.com/RodrigoMvs123/hello-agent-alp-kiro
+Version: 2.0.0
+Agent Type: ALP (Agent Load Protocol) Single Agent
+LLM: Gemini 2.5 Flash
+
+Total Available Tools: 11
+
+================================================================================
+TOOL LISTING
+================================================================================
+
+1. GREET
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Greet a user by name.
+   Type: Read-only
+   Endpoint: /tools/greet
+   
+   Input Parameters:
+     - name (string, required): The name of the person to greet.
+   
+   Output:
+     - message (string): Greeting message
+   
+   Use Case: Quick greeting interactions with users
+   Example: greet(name="Alice") → "Hello, Alice! I'm Hello Agent..."
+
+================================================================================
+
+2. ECHO
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Echo back any text the user sends.
+   Type: Read-only
+   Endpoint: /tools/echo
+   
+   Input Parameters:
+     - text (string, required): The text to echo.
+   
+   Output:
+     - echo (string): The echoed text
+   
+   Use Case: Text reflection and testing
+   Example: echo(text="Hello World") → "Hello World"
+
+================================================================================
+
+3. GET_AGENT_CARD
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Return this agent's own ALP Agent Card as JSON.
+   Type: Read-only
+   Endpoint: /tools/get_agent_card
+   
+   Input Parameters:
+     - (none)
+   
+   Output:
+     - Full Agent Card JSON including metadata, tools, version, etc.
+   
+   Use Case: Agent introspection and configuration retrieval
+   Example: Returns the complete agent.alp.json configuration
+
+================================================================================
+
+4. CHAT
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Send a message to the Gemini-powered AI and get a response.
+                Use this to answer any question or have a conversation.
+   Type: Read-only
+   Endpoint: /tools/chat
+   LLM Provider: Google Gemini 2.5 Flash
+   
+   Input Parameters:
+     - message (string, required): The message or question to send to the AI.
+   
+   Output:
+     - reply (string): The AI-generated response
+   
+   Use Case: General conversation and question answering via Gemini
+   Example: chat(message="What is the Agent Load Protocol?") 
+            → "The Agent Load Protocol is..."
+
+================================================================================
+
+5. SEARCH_KNOWLEDGE
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Search the ALP knowledge base using semantic search.
+                Use this to answer any question about the Agent Load Protocol,
+                ALP concepts, versions, tools, deployment, and how ALP works.
+   Type: Read-only
+   Endpoint: /tools/search_knowledge
+   Embedding Model: Gemini embedding-001
+   
+   Input Parameters:
+     - query (string, required): The question or topic to search for
+     - top_k (integer, optional, default: 3): Number of results to return
+   
+   Output:
+     - results (array): List of knowledge entries
+       * id (string): Entry identifier
+       * category (string): Topic category
+       * question (string): Related question
+       * answer (string): The answer text
+       * score (number): Relevance score (0-1)
+     - count (integer): Number of results returned
+   
+   Use Case: Query ALP documentation and protocol knowledge
+   Knowledge Base Size: 19 entries about ALP
+   Example: search_knowledge(query="How to deploy an agent?", top_k=3)
+
+================================================================================
+
+6. WEB_SEARCH
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Search the live web for current information, news, and 
+                real-time data using Serper (Google Search API).
+   Type: Read-only
+   Endpoint: /tools/web_search
+   Search Provider: Serper (Google Search API)
+   
+   Input Parameters:
+     - query (string, required): The search query to look up on the web
+     - count (integer, optional, default: 5): Number of results to return
+   
+   Output:
+     - results (array): List of search results
+       * title (string): Page title
+       * url (string): Link to the page
+       * description (string): Page snippet
+     - count (integer): Number of results returned
+     - query (string): The search query used
+   
+   Use Case: Real-time web information retrieval, news, current topics
+   Example: web_search(query="latest AI news", count=5)
+
+================================================================================
+
+7. REMEMBER
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Store a key-value memory for the current session.
+                Use this whenever the user mentions something important —
+                a topic, a decision, a preference, a project name —
+                that should be recalled later in the same conversation.
+   Type: Read-Write (Modifies State)
+   Endpoint: /tools/remember
+   Storage: In-process (session memory, cleared on server restart)
+   
+   Input Parameters:
+     - session_id (string, optional, default: 'default'): Session identifier
+     - key (string, required): Short label (e.g., 'current_project', 'user_goal')
+     - value (string, required): The value to store for this key
+   
+   Output:
+     - stored (boolean): Confirmation of storage
+     - session_id (string): The session ID used
+     - key (string): The key stored
+   
+   Use Case: Persist important information across conversation turns
+   Example: remember(key="user_project", value="Media Ingestion Upgrade")
+
+================================================================================
+
+8. RECALL
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Retrieve a stored memory by key. If no key is given, 
+                returns all memories for the session.
+                Use this before answering questions that depend on earlier
+                context in the conversation.
+   Type: Read-only
+   Endpoint: /tools/recall
+   Storage: In-process (retrieves from session memory)
+   
+   Input Parameters:
+     - session_id (string, optional, default: 'default'): Session identifier
+     - key (string, optional): The key to retrieve. Omit for all memories.
+   
+   Output (Single Key):
+     - key (string): The key requested
+     - value (string): The stored value
+     - found (boolean): Whether the key was found
+   
+   Output (All Keys):
+     - memories (object): Key-value pairs for session
+     - count (integer): Number of stored memories
+     - session_id (string): The session ID
+   
+   Use Case: Retrieve previously stored context and preferences
+   Example: recall(key="user_project")
+            → {key: "user_project", value: "Media Ingestion Upgrade", found: true}
+
+================================================================================
+
+9. FORGET
+   ─────────────────────────────────────────────────────────────────────────
+   Description: Delete a specific memory key from the session, or clear 
+                all memories if no key is given.
+   Type: Read-Write (Modifies State)
+   Endpoint: /tools/forget
+   Storage: In-process (modifies session memory)
+   
+   Input Parameters:
+     - session_id (string, optional, default: 'default'): Session identifier
+     - key (string, optional): The key to delete. Omit to clear entire session.
+   
+   Output (Delete Single Key):
+     - cleared (boolean): Whether the key was deleted
+     - key (string): The key that was deleted
+   
+   Output (Clear All):
+     - cleared (boolean): Whether the session was cleared
+     - session_id (string): The session ID that was cleared
+   
+   Use Case: Clean up session memory or specific data points
+   Example: forget(key="user_project")
+            → {cleared: true, key: "user_project"}
+
+================================================================================
+
+10. SEARCH_KNOWLEDGE_DB
+    ───────────────────────────────────────────────────────────────────────
+    Description: Semantic search over the knowledge base in Supabase (pgvector).
+                 Covers ALP docs, transcribed audio, and transcribed video.
+                 Same query interface as search_knowledge.
+    Type: Read-only
+    Endpoint: /tools/search_knowledge_db
+    Database: Supabase PostgreSQL with pgvector extension
+    Embedding Model: Gemini text-embedding-004
+    Table: knowledge_chunks
+    
+    Input Parameters:
+      - query (string, required): The question or topic to search for
+      - top_k (integer, optional, default: 3): Number of results to return
+      - filter_source (string, optional): Filter by source type
+        Possible values: 'audio', 'video', or custom source_type
+    
+    Output:
+      - results (array): List of knowledge chunks
+        * id (string): Chunk identifier
+        * category (string): Content category
+        * question (string): Source or title
+        * answer (string): The text content
+        * score (number): Similarity score
+        * source (object): Source metadata
+          - type (string): 'audio', 'video', or 'document'
+          - id (string): Source identifier
+          - name (string): Source name/label
+      - count (integer): Number of results returned
+    
+    Use Case: Search ingested media transcriptions, video content, audio notes
+    Example: search_knowledge_db(query="media ingestion", top_k=5)
+    Example: search_knowledge_db(query="video content", filter_source="video", top_k=3)
+
+================================================================================
+
+11. INGEST_MEDIA (UPGRADED - Version 2.0.0 — Multi-Modal Analyzer Pipeline)
+    ───────────────────────────────────────────────────────────────────────
+    Description: Ingest ANY file into the knowledge base using the Analyzer pipeline
+                 (Input -> Classify -> Extract -> Chunk -> Embed -> Store).
+                 Routes automatically by file type:
+                   • Audio/Video  → Groq Whisper transcription
+                   • PDF          → pdfplumber (per-page text extraction)
+                   • DOCX         → python-docx (paragraphs + tables)
+                   • Image        → Gemini Vision (OCR + description)
+                   • .txt / .md   → direct read
+                 All content chunked (400 words / 50 overlap), embedded with Gemini,
+                 stored in Supabase. Supports local paths OR public URLs.
+    
+    Type: Read-Write (Modifies State)
+    Endpoint: /tools/ingest_media
+    Backend Services:
+      - Groq Whisper: Audio/video transcription
+      - pdfplumber: PDF text extraction
+      - python-docx: Word document extraction
+      - Gemini Vision (gemini-2.5-flash): Image OCR + description
+      - Gemini Embeddings (gemini-embedding-001): Text embedding
+      - Supabase: pgvector knowledge storage
+    
+    Input Parameters:
+      - file_path (string, required):
+        * Absolute path to local file OR public HTTPS URL
+        * Google Drive share links auto-converted to direct download
+      - source_name (string, optional): Human-readable label. Defaults to filename.
+    
+    Output:
+      - status (string): 'ok' or 'error'
+      - source_type (string): 'audio', 'video', 'pdf', 'docx', 'image', or 'text'
+      - chunks_ingested (integer): Number of chunks stored in Supabase
+      - source_name (string): Label used
+      - transcript_preview (string): First 300 chars of extracted content
+      - error (string): Error message if applicable
+    
+    Supported Formats:
+      Audio:     .mp3 .wav .m4a .ogg .flac
+      Video:     .mp4 .mov .avi .mkv .webm
+      Document:  .pdf .docx .txt .md
+      Image:     .jpg .jpeg .png .webp
+    
+    Analyzer Architecture:
+      classify_file() → EXTRACTORS[category]() → chunk → embed → upsert
+    
+    Use Case: Build a searchable knowledge base from any file type
+    Example: ingest_media(file_path="/uploads/report.pdf", source_name="Q1 Report")
+    Example: ingest_media(
+               file_path="https://drive.google.com/file/d/FILE_ID/view",
+               source_name="Product Demo"
+             )
+
+================================================================================
+TOOL CATEGORIES
+================================================================================
+
+INTERACTION TOOLS (4):
+  • greet
+  • echo
+  • chat
+  • get_agent_card
+  Purpose: Agent interaction and introspection
+
+KNOWLEDGE & MEDIA TOOLS (3):
+  • search_knowledge
+  • search_knowledge_db
+  • ingest_media
+  Purpose: Knowledge base management and semantic search
+
+SESSION MANAGEMENT TOOLS (3):
+  • remember
+  • recall
+  • forget
+  Purpose: Session-level memory persistence
+
+EXTERNAL DATA TOOLS (1):
+  • web_search
+  Purpose: Real-time information retrieval
+
+================================================================================
+PERMISSIONS & SAFETY
+================================================================================
+
+READ-ONLY TOOLS (Safe, No Side Effects):
+  • greet
+  • echo
+  • get_agent_card
+  • chat
+  • search_knowledge
+  • web_search
+  • recall
+  • search_knowledge_db
+
+READ-WRITE TOOLS (Modify State):
+  • remember (adds/updates session memory)
+  • forget (deletes session memory)
+  • ingest_media (modifies knowledge database)
+
+================================================================================
+ENDPOINTS REFERENCE
+================================================================================
+
+REST Endpoints (Claude Code / Claude Desktop):
+  GET  /health              - Server health check
+  GET  /agent               - Agent Card JSON
+  GET  /persona             - Agent persona/system prompt
+  GET  /agents              - All hosted agent cards
+  GET  /tools               - Tool list (REST)
+  GET  /logs                - Recent log entries
+  GET  /                    - HTML Dashboard
+  GET  /chat-ui             - Chat UI
+  POST /tools/{tool_name}   - Execute a tool
+  POST /chat                - Chat endpoint
+  
+MCP Endpoints (Kiro):
+  GET  /mcp                 - MCP SSE transport (streaming)
+  POST /mcp                 - MCP JSON-RPC messages
+
+Media Ingestion Endpoints (New in v1.5.0):
+  POST /upload              - File upload (multipart/form-data)
+  POST /ingest-url          - URL ingestion (JSON request)
+
+================================================================================
+EXTERNAL SERVICES & CREDENTIALS REQUIRED
+================================================================================
+
+Google Gemini API:
+  - Environment Variable: GEMINI_API_KEY
+  - Model: gemini-2.5-flash
+  - Usage: Chat, embedding, text generation
+  - Status: REQUIRED
+  - Free Tier: Available at https://aistudio.google.com
+
+Groq API (Whisper Transcription):
+  - Environment Variable: GROQ_API_KEY
+  - Model: whisper-large-v3
+  - Usage: Audio/video transcription for ingest_media
+  - Status: REQUIRED for media ingestion
+  - Free Tier: Available at https://console.groq.com
+
+Supabase (Database):
+  - Environment Variables: SUPABASE_URL, SUPABASE_KEY
+  - Usage: pgvector semantic search, knowledge storage
+  - Status: REQUIRED for search_knowledge_db and ingest_media
+  - Database Table: knowledge_chunks
+  - Extensions: pgvector
+
+Serper API (Web Search):
+  - Environment Variable: SERPER_API_KEY
+  - Service: Google Search results
+  - Usage: web_search tool
+  - Status: OPTIONAL (web_search disabled if not set)
+  - Free Tier: Available at https://serper.dev
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+v2.0.0 (Current - July 2026)
+  NEW FEATURES:
+  • Multi-Modal Analyzer Pipeline — ingest_media now handles 6 file types
+  • PDF ingestion via pdfplumber (per-page text extraction)
+  • DOCX ingestion via python-docx (paragraphs + tables)
+  • Image ingestion via Gemini Vision (OCR + description)
+  • Plain text / Markdown ingestion (direct read)
+  • classify_file() router — extensible architecture for future file types
+  
+  UPDATED TOOLS:
+  • ingest_media: Now accepts .pdf .docx .txt .md .jpg .jpeg .png .webp in addition to audio/video
+  
+  NEW DEPENDENCIES:
+  • pdfplumber, python-docx, Pillow
+
+v1.5.0 (Previous)
+  NEW FEATURES:
+  • Enhanced ingest_media tool with URL support
+  • Added Google Drive link auto-conversion
+  • New POST /upload endpoint for file uploads
+  • New POST /ingest-url endpoint for URL ingestion
+  • Added python-multipart and supabase dependencies
+  
+  UPDATED TOOLS:
+  • ingest_media: Now accepts URLs in addition to local paths
+  
+  CHANGES:
+  • Updated agent card descriptions
+  • Added URL ingestion support documentation
+
+v1.4.0 (Previous)
+  • Core agent functionality
+  • Basic ingest_media tool (local files only)
+  • Knowledge search capabilities
+  • Session memory system
+
+================================================================================
+DEPLOYMENT INFORMATION
+================================================================================
+
+Current Deployment:
+  Server URL: https://hello-agent-alp-kiro.onrender.com
+  Deployment Platform: Render.com
+  Deployment Method: GitHub Actions (automatic)
+  Auto-Deploy Trigger: Push to main branch
+  Build Status: Check at https://github.com/RodrigoMvs123/hello-agent-alp-kiro/actions
+
+Current Branch:
+  Feature Branch: feature/media-ingestion-upgrade
+  Status: Ready for deployment
+  Latest Commit: 670ecc6
+
+To Deploy:
+  1. Merge feature/media-ingestion-upgrade to main
+  2. Push to GitHub
+  3. GitHub Actions will automatically trigger deployment
+  4. Render will rebuild and deploy within ~2 minutes
+
+================================================================================
+USAGE NOTES
+================================================================================
+
+Session Memory (remember/recall/forget):
+  • In-process storage - cleared when server restarts
+  • Default session ID: 'default'
+  • Use custom session_id for multi-user scenarios
+  • Max stored entries per session: Unlimited (limited by RAM)
+
+Knowledge Base:
+  • search_knowledge: Static ALP documentation (19 entries)
+  • search_knowledge_db: Dynamic, grows with ingested media
+  • Both use semantic similarity scoring (0-1 scale)
+  • Embeddings refresh on server startup
+
+Media Ingestion:
+  • Timeout: 120 seconds for URL downloads
+  • Max file size: Groq API limit (~25MB per file)
+  • Chunk size: 500 characters with 50-char overlap
+  • Transcription language: Detected automatically by Whisper
+  • Storage: Permanent in Supabase (not cleared on restart)
+
+Web Search:
+  • Results cached by Serper (time-based)
+  • Returns: Title, URL, description (snippet)
+  • Disabled if SERPER_API_KEY not configured
+
+================================================================================
+SUPPORT & DOCUMENTATION
+================================================================================
+
+Project Repository:
+  https://github.com/RodrigoMvs123/hello-agent-alp-kiro
+
+Agent Load Protocol (ALP):
+  https://github.com/RodrigoMvs123/agent-load-protocol
+
+Live Server:
+  https://hello-agent-alp-kiro.onrender.com
+
+Agent Card:
+  https://hello-agent-alp-kiro.onrender.com/agent
+
+API Documentation:
+  GET https://hello-agent-alp-kiro.onrender.com/tools
+
+Health Check:
+  GET https://hello-agent-alp-kiro.onrender.com/health
+
+================================================================================
+END OF TOOLS DOCUMENTATION
+================================================================================
+
+Generated: 2026-06-11
+Project Version: 1.5.0
+Total Tools Documented: 11
