@@ -241,7 +241,7 @@
     },
     {
       "name": "ingest_media",
-      "description": "Ingest an audio or video file into the knowledge base. Transcribes with Groq Whisper, chunks, embeds with Gemini, stores in Supabase. Supports local file paths OR public URLs (Google Drive, tmpfiles.org, direct links). Formats: .mp3 .wav .m4a .ogg .flac .mp4 .mov .avi .mkv .webm",
+      "description": "Ingest a file into the knowledge base using the Analyzer pipeline (Input -> Parse -> Extract -> Classify -> Output). Routes automatically by file type: audio/video is transcribed with Groq Whisper, PDF and DOCX text is extracted directly, images are OCR'd and described with Gemini Vision, plain text is read as-is. All content is chunked, embedded with Gemini, and stored in Supabase. Supports local file paths OR public URLs (Google Drive, tmpfiles.org, direct links). Formats: .mp3 .wav .m4a .ogg .flac .mp4 .mov .avi .mkv .webm .pdf .docx .txt .md .jpg .jpeg .png .webp",
       "endpoint": "/tools/ingest_media",
       "readonly": false,
       "input_schema": {
@@ -324,7 +324,7 @@
   },
   "metadata": {
     "author": "RodrigoMvs123",
-    "version": "1.5.0",
+    "version": "2.0.0",
     "tags": ["hello-agent", "github-native", "auto-deploy", "alp", "gemini", "web-search", "serper", "session-memory", "supabase", "pgvector", "groq", "whisper", "media-ingestion", "file-upload", "url-ingestion"],
     "repository": "https://github.com/RodrigoMvs123/hello-agent-alp-kiro"
   }

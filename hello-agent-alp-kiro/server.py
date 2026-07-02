@@ -51,7 +51,11 @@ import google.generativeai as genai
 import groq
 import httpx
 import numpy as np
+import pdfplumber
 import supabase
+from docx import Document as DocxDocument
+from PIL import Image
+import io
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -595,28 +599,140 @@ TOOLS: dict[str, dict] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Analyzer Router — classify + extract (v2.0.0)
+# ---------------------------------------------------------------------------
+
+def classify_file(file_path: str) -> str:
+    """
+    Classify step: maps a file extension to an analyzer category.
+    Returns one of: 'audio_video', 'pdf', 'docx', 'image', 'text', 'unsupported'
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    AUDIO_VIDEO = {".mp3", ".wav", ".m4a", ".ogg", ".flac",
+                   ".mp4", ".mov", ".avi", ".mkv", ".webm"}
+    IMAGE = {".jpg", ".jpeg", ".png", ".webp"}
+    if ext in AUDIO_VIDEO:
+        return "audio_video"
+    elif ext == ".pdf":
+        return "pdf"
+    elif ext == ".docx":
+        return "docx"
+    elif ext in IMAGE:
+        return "image"
+    elif ext in {".txt", ".md"}:
+        return "text"
+    else:
+        return "unsupported"
+
+
+async def extract_audio_video(file_path: str) -> str:
+    """Route audio/video through the existing Whisper transcription pipeline."""
+    return await _transcribe_media(file_path)
+
+
+def extract_pdf(file_path: str) -> str:
+    """Extract text page by page from a PDF using pdfplumber."""
+    text_parts = []
+    with pdfplumber.open(file_path) as pdf:
+        for page_num, page in enumerate(pdf.pages, start=1):
+            page_text = page.extract_text() or ""
+            if page_text.strip():
+                text_parts.append(f"[Page {page_num}]\n{page_text}")
+    return "\n\n".join(text_parts)
+
+
+def extract_docx(file_path: str) -> str:
+    """Extract paragraphs and table cells from a Word document."""
+    doc = DocxDocument(file_path)
+    text_parts = [p.text for p in doc.paragraphs if p.text.strip()]
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(cell.text.strip() for cell in row.cells)
+            if row_text.strip(" |"):
+                text_parts.append(row_text)
+    return "\n".join(text_parts)
+
+
+async def extract_image(file_path: str) -> str:
+    """
+    Use Gemini Vision to OCR + describe an image.
+    Returns text combining any readable text with a short description.
+    """
+    with Image.open(file_path) as img:
+        img.load()
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="JPEG")
+        image_bytes = buf.getvalue()
+
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    response = model.generate_content([
+        {"mime_type": "image/jpeg", "data": image_bytes},
+        "Transcribe any visible text verbatim under a line labeled 'OCR:'. "
+        "Then on a new line labeled 'Description:' write a concise factual "
+        "description of the image content."
+    ])
+    return response.text
+
+
+def extract_text_file(file_path: str) -> str:
+    """Plain .txt / .md files — read directly."""
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        return f.read()
+
+
 async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
     """
-    Shared ingestion pipeline:
-    1. Transcribe audio/video with _transcribe_media (handles chunking for large files)
-    2. Chunk the transcript
-    3. Embed each chunk with Gemini
-    4. Store in Supabase via _upsert_chunks
+    Analyzer pipeline: Input -> classify_file -> extract_* -> chunk -> embed -> store.
+    1. classify_file() picks the analyzer category from the file extension
+    2. matching extract_* function returns plain text
+    3. chunk the text (400 words, 50 word overlap)
+    4. embed each chunk with Gemini
+    5. upsert into Supabase knowledge_chunks, tagged with source_type
     """
-    # --- Step 1: Transcribe (handles video extraction + large file splitting) ---
-    transcript_text = await _transcribe_media(file_path)
+    category = classify_file(file_path)
 
-    if not transcript_text.strip():
-        return {"status": "error", "error": "Transcription returned empty text"}
+    EXTRACTORS = {
+        "audio_video": extract_audio_video,
+        "pdf":         extract_pdf,
+        "docx":        extract_docx,
+        "image":       extract_image,
+        "text":        extract_text_file,
+    }
 
-    # --- Step 2: Semantic chunk (400 words, 50 word overlap) ---
+    if category == "unsupported":
+        return {"status": "error", "error": f"Unsupported file type: {file_path}"}
+
+    extractor = EXTRACTORS[category]
+    # image and audio_video extractors are async; pdf/docx/text are sync
+    if asyncio.iscoroutinefunction(extractor):
+        transcript_text = await extractor(file_path)
+    else:
+        transcript_text = extractor(file_path)
+
+    if not transcript_text or not transcript_text.strip():
+        return {"status": "error", "error": f"{category} extractor returned empty text"}
+
+    # --- Chunk (400 words, 50 word overlap) ---
     text_chunks = _split_into_chunks(transcript_text, chunk_words=400, overlap_words=50)
 
     source_id = os.path.basename(file_path)
-    ext = os.path.splitext(file_path)[1].lower()
-    source_type = "audio" if ext in {".mp3", ".wav", ".m4a", ".ogg", ".flac"} else "video"
 
-    # --- Step 3: Embed and upsert in batches of 10 ---
+    SOURCE_TYPE_LABELS = {
+        "audio_video": "video",
+        "pdf":         "pdf",
+        "docx":        "docx",
+        "image":       "image",
+        "text":        "text",
+    }
+    # Refine audio_video to audio if it's a pure audio file
+    if category == "audio_video":
+        ext = os.path.splitext(file_path)[1].lower()
+        source_type = "audio" if ext in {".mp3", ".wav", ".m4a", ".ogg", ".flac"} else "video"
+    else:
+        source_type = SOURCE_TYPE_LABELS[category]
+
+    # --- Embed and upsert in batches of 10 ---
     BATCH = 10
     total = 0
     for batch_start in range(0, len(text_chunks), BATCH):
@@ -633,7 +749,7 @@ async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
                 "chunk_index": global_idx,
                 "text":        chunk_text,
                 "metadata":    {"chunk_index": global_idx, "total_chunks": len(text_chunks)},
-                "embedding":   embedding
+                "embedding":   embedding,
             })
         await _upsert_chunks(rows)
         total += len(rows)
@@ -641,9 +757,10 @@ async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
     return {
         "status": "ok",
         "source_name": source_name,
+        "source_type": source_type,
         "chunks_ingested": total,
         "source_id": source_id,
-        "transcript_preview": transcript_text[:300] + ("..." if len(transcript_text) > 300 else "")
+        "transcript_preview": transcript_text[:300] + ("..." if len(transcript_text) > 300 else ""),
     }
 
 
@@ -658,8 +775,13 @@ async def upload_and_ingest(
     Called by Claude when a user uploads a file directly in the chat.
     """
     ALLOWED_EXTENSIONS = {
+        # audio / video
         ".mp3", ".wav", ".m4a", ".ogg", ".flac",
-        ".mp4", ".mov", ".avi", ".mkv", ".webm"
+        ".mp4", ".mov", ".avi", ".mkv", ".webm",
+        # documents
+        ".pdf", ".docx", ".txt", ".md",
+        # images
+        ".jpg", ".jpeg", ".png", ".webp",
     }
 
     # Validate file extension
