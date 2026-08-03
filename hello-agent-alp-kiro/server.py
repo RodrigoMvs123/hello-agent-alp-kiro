@@ -539,6 +539,23 @@ async def _download_url_to_tempfile(url: str, source_name: str) -> tuple[str, st
     return tmp_path, ext, label
 
 
+# ---------------------------------------------------------------------------
+# Ingestion exception hierarchy
+# ---------------------------------------------------------------------------
+
+class DownloadError(Exception):
+    """Raised when a remote file cannot be downloaded."""
+
+class ExtractionError(Exception):
+    """Raised when the per-type extractor fails to produce text."""
+
+class EmbeddingError(Exception):
+    """Raised when Gemini fails to embed a chunk."""
+
+class StorageError(Exception):
+    """Raised when the Supabase upsert fails."""
+
+
 async def tool_ingest_media(input_data: dict) -> dict:
     """
     Ingest an audio or video file into the knowledge base.
@@ -558,9 +575,21 @@ async def tool_ingest_media(input_data: dict) -> dict:
         try:
             tmp_path, _, label = await _download_url_to_tempfile(file_path, source_name)
             return await run_ingestion_pipeline(tmp_path, label)
+        except DownloadError as e:
+            _log("error", f"ingest_media download error: {e}")
+            return {"status": "error", "stage": "download", "error": str(e)}
+        except ExtractionError as e:
+            _log("error", f"ingest_media extraction error: {e}")
+            return {"status": "error", "stage": "extraction", "error": str(e)}
+        except EmbeddingError as e:
+            _log("error", f"ingest_media embedding error: {e}")
+            return {"status": "error", "stage": "embedding", "error": str(e)}
+        except StorageError as e:
+            _log("error", f"ingest_media storage error: {e}")
+            return {"status": "error", "stage": "storage", "error": str(e)}
         except Exception as e:
-            _log("error", f"ingest_media URL download error: {type(e).__name__}: {e}")
-            return {"status": "error", "error": f"Download failed: {type(e).__name__}: {e}"}
+            _log("error", f"ingest_media unexpected error: {type(e).__name__}: {e}")
+            return {"status": "error", "stage": "unknown", "error": f"{type(e).__name__}: {e}"}
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)
@@ -573,9 +602,18 @@ async def tool_ingest_media(input_data: dict) -> dict:
     try:
         label = source_name or os.path.basename(file_path)
         return await run_ingestion_pipeline(file_path, label)
+    except ExtractionError as e:
+        _log("error", f"ingest_media extraction error: {e}")
+        return {"status": "error", "stage": "extraction", "error": str(e)}
+    except EmbeddingError as e:
+        _log("error", f"ingest_media embedding error: {e}")
+        return {"status": "error", "stage": "embedding", "error": str(e)}
+    except StorageError as e:
+        _log("error", f"ingest_media storage error: {e}")
+        return {"status": "error", "stage": "storage", "error": str(e)}
     except Exception as e:
-        _log("error", f"ingest_media pipeline error: {type(e).__name__}: {e}")
-        return {"status": "error", "error": f"Ingestion failed: {type(e).__name__}: {e}"}
+        _log("error", f"ingest_media unexpected error: {type(e).__name__}: {e}")
+        return {"status": "error", "stage": "unknown", "error": f"{type(e).__name__}: {e}"}
 
 
 TOOLS: dict[str, dict] = {
@@ -705,13 +743,16 @@ async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
 
     extractor = EXTRACTORS[category]
     # image and audio_video extractors are async; pdf/docx/text are sync
-    if asyncio.iscoroutinefunction(extractor):
-        transcript_text = await extractor(file_path)
-    else:
-        transcript_text = extractor(file_path)
+    try:
+        if asyncio.iscoroutinefunction(extractor):
+            transcript_text = await extractor(file_path)
+        else:
+            transcript_text = extractor(file_path)
+    except Exception as e:
+        raise ExtractionError(f"{category} extraction failed: {type(e).__name__}: {e}") from e
 
     if not transcript_text or not transcript_text.strip():
-        return {"status": "error", "error": f"{category} extractor returned empty text"}
+        raise ExtractionError(f"{category} extractor returned empty text")
 
     # --- Chunk (400 words, 50 word overlap) ---
     text_chunks = _split_into_chunks(transcript_text, chunk_words=400, overlap_words=50)
@@ -740,7 +781,12 @@ async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
         rows = []
         for i, chunk_text in enumerate(batch):
             global_idx = batch_start + i
-            embedding = await _embed_text(chunk_text, task_type="RETRIEVAL_DOCUMENT")
+            try:
+                embedding = await _embed_text(chunk_text, task_type="RETRIEVAL_DOCUMENT")
+            except Exception as e:
+                raise EmbeddingError(
+                    f"Gemini embedding failed at chunk {global_idx}: {type(e).__name__}: {e}"
+                ) from e
             rows.append({
                 "chunk_id":    f"{source_id}_{global_idx}",
                 "source_type": source_type,
@@ -751,7 +797,26 @@ async def run_ingestion_pipeline(file_path: str, source_name: str) -> dict:
                 "metadata":    {"chunk_index": global_idx, "total_chunks": len(text_chunks)},
                 "embedding":   embedding,
             })
-        await _upsert_chunks(rows)
+        try:
+            await _upsert_chunks(rows)
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            if status_code in (401, 403):
+                raise StorageError(
+                    f"Supabase upsert failed (auth error {status_code} — check SUPABASE_KEY): {e}"
+                ) from e
+            else:
+                raise StorageError(
+                    f"Supabase upsert failed (HTTP {status_code}): {e}"
+                ) from e
+        except httpx.ConnectError as e:
+            raise StorageError(
+                f"Supabase upsert failed (connection error — project may be paused): {type(e).__name__}: {e}"
+            ) from e
+        except Exception as e:
+            raise StorageError(
+                f"Supabase upsert failed: {type(e).__name__}: {e}"
+            ) from e
         total += len(rows)
 
     return {
