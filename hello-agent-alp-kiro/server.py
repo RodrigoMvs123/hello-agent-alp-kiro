@@ -616,6 +616,639 @@ async def tool_ingest_media(input_data: dict) -> dict:
         return {"status": "error", "stage": "unknown", "error": f"{type(e).__name__}: {e}"}
 
 
+# ---------------------------------------------------------------------------
+# Topic Research — Supabase helpers
+# ---------------------------------------------------------------------------
+
+def _sb_headers() -> dict:
+    key = os.getenv("SUPABASE_KEY", "")
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+
+async def _sb_get(path: str, params: dict | None = None) -> list:
+    url = f"{os.getenv('SUPABASE_URL')}/rest/v1/{path}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=_sb_headers(), params=params, timeout=15.0)
+        resp.raise_for_status()
+    return resp.json()
+
+
+async def _sb_insert(table: str, rows: list[dict]) -> None:
+    url = f"{os.getenv('SUPABASE_URL')}/rest/v1/{table}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, headers=_sb_headers(), json=rows, timeout=15.0)
+        if not resp.is_success:
+            _log("error", f"Supabase insert error {resp.status_code}: {resp.text}")
+        resp.raise_for_status()
+
+
+# ---------------------------------------------------------------------------
+# Topic config — per-topic search terms and watchlist entities
+# ---------------------------------------------------------------------------
+
+TOPIC_CONFIG: dict[str, dict] = {
+    "brazil-rbc": {
+        "search_terms": [
+            "Renda Básica de Cidadania",
+            "Renda Básica Universal",
+            "Lei 10.835/2004",
+            "PL 107/2023 São Paulo",
+            "PL 991/2025 São Paulo estado",
+            "modelo Maricá renda básica",
+            "moeda social municipal",
+            "Mumbuca",
+            "banco comunitário renda básica",
+            "renda básica municipal projeto de lei",
+        ],
+        "watchlist": [
+            "sp-pl-107-2023",
+            "sp-state-pl-991-2025",
+            "marica-rbc",
+            "cadunico-digital",
+        ],
+        "known_entities": {
+            # Compound aliases: list-of-strings means ALL terms must appear (AND logic).
+            # Prevents bare number matches across different bill types / legislative bodies.
+            "sp-pl-107-2023": [
+                ["PL 107/2023", "São Paulo"],
+                ["PL 107/2023", "Câmara Municipal"],
+                ["PL 107/2023", "Renda Básica"],
+                ["PL 107/2023", "Suplicy"],
+                "PL0107-2023",  # saopaulo.sp.leg.br canonical filename format
+                "idProposicao=2346787",  # camara.leg.br canonical id for this bill
+            ],
+            "sp-state-pl-991-2025": [
+                ["PL 991/2025", "São Paulo"],
+                ["991/2025", "estado"],
+                ["991/2025", "Renda Básica"],
+                "idProposicao=2487038",  # camara.leg.br canonical id
+                "id=1000629940",         # al.sp.gov.br canonical id
+            ],
+            "marica-rbc": ["Maricá", "Marica", "Mumbuca", "marica-rbc"],
+            "santo-antonio-pinhal-rbc": ["Santo Antônio do Pinhal", "Santo Antonio do Pinhal"],
+            "apiai-pl-018-2013": ["Apiaí", "Apiai", "PL 018/2013"],
+            "cadunico-digital": ["CadÚnico", "Cadastro Único", "71003.035760/2026-01"],
+            "federal-pl-290-2026": ["PL 290/2026", "RUC-IPD"],
+        },
+    }
+}
+
+
+def _match_entity(text: str, topic: str) -> str | None:
+    """Match text against known entity aliases. Returns entity id or None.
+    Alias formats:
+      str          — single term, case-insensitive substring match
+      list[str]    — ALL terms must appear (AND logic, prevents bare-number cross-matches)
+    """
+    config = TOPIC_CONFIG.get(topic, {})
+    tl = text.lower()
+    for entity_id, aliases in config.get("known_entities", {}).items():
+        for alias in aliases:
+            if isinstance(alias, list):
+                if all(a.lower() in tl for a in alias):
+                    return entity_id
+            else:
+                if alias.lower() in tl:
+                    return entity_id
+    return None
+
+
+def _classify_result(title: str, description: str, topic: str) -> str:
+    """Classify a search result into topic-defined categories."""
+    if topic != "brazil-rbc":
+        return "unknown"
+    text = f"{title} {description}".lower()
+    if any(kw in text for kw in [
+        "renda básica de cidadania", "lei 10.835", "rbc", "renda básica universal",
+        "pl 107/2023", "pl 991/2025", "suplicy",
+    ]):
+        return "A"
+    if any(kw in text for kw in [
+        "mumbuca", "moeda social", "banco comunitário", "modelo maricá",
+        "inspirado em maricá", "moeda social digital",
+    ]):
+        return "B"
+    if any(kw in text for kw in [
+        "bolsa família", "auxílio", "benefício assistencial", "cras", "creas",
+    ]):
+        return "C"
+    return "B"
+
+
+_STATUS_VOCABULARY = """
+Valid status labels (use exactly one, lowercase with underscores):
+  introduced                   - bill/proposal formally submitted
+  committee_review             - under committee analysis
+  committee_opinion_issued     - committee issued a formal opinion
+  urgency_requested            - urgency regime requested
+  first_discussion_scheduled   - placed on Ordem do Dia for first vote
+  first_discussion_approved    - passed first plenary discussion/vote
+  second_discussion_scheduled  - placed on Ordem do Dia for second vote
+  second_discussion_approved   - passed second plenary discussion/vote
+  sanctioned                   - signed into law by executive
+  vetoed                       - vetoed by executive
+  archived                     - archived/shelved without approval
+  regulated                    - implementing regulation published
+  operational                  - program actively paying beneficiaries
+  recadastramento              - active re-registration/update campaign
+  amended                      - amendment submitted or approved
+  hearing_scheduled            - public hearing scheduled
+  no_recent_movement           - no new official movement found
+  discovered                   - FALLBACK: use only if none of the above can be determined
+"""
+
+
+_STATUS_VALID = {
+    "introduced", "committee_review", "committee_opinion_issued",
+    "urgency_requested", "first_discussion_scheduled",
+    "first_discussion_approved", "second_discussion_scheduled",
+    "second_discussion_approved", "sanctioned", "vetoed", "archived",
+    "regulated", "operational", "recadastramento", "amended",
+    "hearing_scheduled", "no_recent_movement", "discovered",
+}
+
+# Domains where fetching page content is safe and useful
+_FETCHABLE_DOMAINS = [
+    "leg.br", "gov.br", "al.sp.gov.br", "saopaulo.sp.leg.br",
+    "marica.rj.gov.br", "senado.leg.br", "camara.leg.br",
+]
+# KNOWN LIMITATION: camara.leg.br/proposicoesWeb/fichadetramitacao pages are
+# JavaScript-rendered. _fetch_page_text receives only the JS scaffolding HTML,
+# not the rendered tramitação table, so Gemini cannot extract a real legislative
+# stage and falls back to status "discovered" for those rows.
+# Future fix: add a Playwright/Splash fetch path for JS-heavy domains.
+async def _fetch_page_text(url: str, max_chars: int = 3000) -> str | None:
+    """
+    Fetch a page and return its visible text content (stripped of HTML tags).
+    Uses the existing httpx.AsyncClient pattern from the codebase.
+    Returns None on any failure — callers must handle gracefully.
+    """
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            if not resp.is_success:
+                return None
+            ct = resp.headers.get("content-type", "")
+            # Only process HTML and plain text; skip PDFs, binaries.
+            # KNOWN LIMITATION: Bills whose full text lives only in a PDF (e.g.
+            # saopaulo.sp.leg.br/iah/fulltext/projeto/PL0107-2023.pdf) will not
+            # have their legislative stage extracted here. Gemini falls back to
+            # the search snippet, which rarely contains a stage keyword, so the
+            # stored status becomes "discovered". The diff logic will surface a
+            # real CHANGED entry once a fetchable HTML page reflects movement.
+            # Future fix: pipe PDF URLs through the existing pdfplumber extractor.
+            if "pdf" in ct or "octet-stream" in ct:
+                return None
+            raw = resp.text
+        # Strip HTML tags with a simple regex — no new dependency
+        text = re.sub(r"<[^>]+>", " ", raw)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_chars]
+    except Exception:
+        return None
+
+
+async def _extract_status_with_gemini(
+    title: str, description: str, entity: str,
+    url: str = "", source_type: str = "discovery"
+) -> str:
+    """
+    Extract a precise legislative/program status label using Gemini.
+    For official_primary URLs: fetches actual page content first.
+    Falls back to snippet, then to 'discovered' only if content is genuinely uninformative.
+    """
+    if not _gemini:
+        return "discovered"
+
+    # For official sources, attempt to fetch real page content
+    page_text = ""
+    if source_type == "official_primary" and url and any(d in url for d in _FETCHABLE_DOMAINS):
+        fetched = await _fetch_page_text(url)
+        if fetched:
+            page_text = fetched
+            _log("info", f"Fetched {len(page_text)} chars from {url} for status extraction")
+        else:
+            _log("warning", f"Could not fetch page content from {url}, falling back to snippet")
+
+    content = page_text if page_text else f"Title: {title}\nSnippet: {description}"
+
+    prompt = f"""You are a Brazilian legislative research assistant.
+
+Analyze the following content about the entity '{entity}' and extract its most precise
+current status label from the vocabulary below.
+
+Content:
+{content[:2500]}
+
+{_STATUS_VOCABULARY}
+
+Respond with ONLY the single status label, nothing else. No explanation, no punctuation.
+If the content genuinely contains no status information, respond with: discovered"""
+    try:
+        response = _gemini.generate_content(prompt)
+        raw = response.text.strip().lower().replace(" ", "_").replace("-", "_")
+        result = raw if raw in _STATUS_VALID else "discovered"
+        _log("info", f"Status extracted for '{entity}': {result} (source_type={source_type}, page_fetched={bool(page_text)})")
+        return result
+    except Exception as e:
+        _log("warning", f"Gemini status extraction failed for '{entity}': {e}")
+        return "discovered"
+
+
+# ---------------------------------------------------------------------------
+# research_topic
+# ---------------------------------------------------------------------------
+
+async def tool_research_topic(input_data: dict) -> dict:
+    """
+    Longitudinal topic research tool.
+    Steps: A) load existing knowledge -> B) web search -> C) entity match
+           -> D) classify -> E) ingest new/changed evidence.
+    Input:  { topic, since (optional), scope (optional), force_full_scan (optional) }
+    Output: { topic, existing_entities, new_findings, ingested, errors, status }
+    """
+    topic = input_data.get("topic", "").strip()
+    since = input_data.get("since")
+    force_full_scan = bool(input_data.get("force_full_scan", False))
+
+    if not topic:
+        raise RuntimeError("topic is required")
+    if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
+        raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required")
+    if not SERPER_API_KEY:
+        raise RuntimeError("SERPER_API_KEY is required for research_topic")
+
+    errors: list[str] = []
+
+    # Step A: load existing entity states
+    try:
+        existing_rows = await _sb_get(
+            "topic_events",
+            {
+                "topic": f"eq.{topic}",
+                "select": "entity,status,event_date,source_url,created_at",
+                "order": "entity.asc,created_at.desc",
+            }
+        )
+    except Exception as e:
+        raise RuntimeError(f"[PARTIAL] Failed to load existing knowledge: {e}")
+
+    existing_entities: dict[str, dict] = {}
+    for row in existing_rows:
+        eid = row["entity"]
+        if eid not in existing_entities:
+            existing_entities[eid] = row
+
+    known_urls: set[str] = {r["source_url"] for r in existing_rows if r.get("source_url")}
+    _log("info", f"research_topic [{topic}]: {len(existing_entities)} known entities")
+
+    # Step B: web search
+    config = TOPIC_CONFIG.get(topic, {})
+    search_terms = config.get("search_terms", [topic])
+    if not force_full_scan and since:
+        search_terms = search_terms[:5]
+
+    raw_results: list[dict] = []
+    for term in search_terms:
+        try:
+            resp = httpx.post(
+                "https://google.serper.dev/search",
+                headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+                json={"q": term, "num": 5},
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            for r in resp.json().get("organic", []):
+                raw_results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("link", ""),
+                    "description": r.get("snippet", ""),
+                })
+        except Exception as e:
+            errors.append(f"Search failed for '{term}': {e}")
+
+    # Deduplicate by URL
+    seen_urls: set[str] = set()
+    deduped: list[dict] = []
+    for r in raw_results:
+        if r["url"] and r["url"] not in seen_urls:
+            seen_urls.add(r["url"])
+            deduped.append(r)
+
+    # Steps C/D/E: match, classify, ingest
+    new_findings: list[dict] = []
+    ingested: list[dict] = []
+    now = datetime.utcnow().isoformat() + "Z"
+
+    official_domains = [
+        "leg.br", "gov.br", "sp.gov.br", "camara.leg.br", "senado.leg.br",
+        "al.sp.gov.br", "saopaulo.sp.leg.br", "marica.rj.gov.br",
+    ]
+
+    for result in deduped:
+        url = result["url"]
+        title = result["title"]
+        description = result["description"]
+        combined_text = f"{title}. {description}"
+
+        # Always skip URLs already in the DB for discovery candidates.
+        # force_full_scan only re-processes known aliased entities, not already-seen URLs.
+        entity_candidate = _match_entity(combined_text, topic)
+        if not entity_candidate and url in known_urls:
+            continue
+        if not force_full_scan and url in known_urls:
+            continue
+
+        entity = entity_candidate or "discovery-" + uuid.uuid4().hex[:8]
+        is_new_entity = entity.startswith("discovery-")
+        category = _classify_result(title, description, topic)
+
+        source_type = "discovery"
+        if any(d in url for d in official_domains):
+            source_type = "official_primary"
+        elif any(d in url for d in ["wikipedia", "agencia", "folha", "estadao", "globo"]):
+            source_type = "secondary"
+
+        # Extract precise status via Gemini.
+        # For official_primary URLs: fetches actual page content before calling Gemini.
+        # Falls back to snippet, then to 'discovered' only if genuinely uninformative.
+        status = await _extract_status_with_gemini(title, description, entity, url=url, source_type=source_type)
+
+        finding = {
+            "topic": topic,
+            "entity": entity,
+            "status": status,
+            "category": category,
+            "event_date": None,
+            "source_url": url,
+            "source_title": title,
+            "source_type": source_type,
+            "official_source": source_type == "official_primary",
+            "summary": description[:500],
+            "raw_text": combined_text[:1000],
+            "last_verified_at": now,
+        }
+        new_findings.append(finding)
+
+        existing = existing_entities.get(entity)
+        # For discovery entities: url already in known_urls means it was ingested before under a different discovery id.
+        is_changed = existing is None or existing.get("source_url") != url
+        if is_new_entity and url in known_urls:
+            is_changed = False
+        if is_changed:
+            try:
+                await _sb_insert("topic_events", [{
+                    k: v for k, v in finding.items()
+                    if k in {
+                        "topic", "entity", "status", "category", "event_date",
+                        "source_url", "source_title", "source_type", "official_source",
+                        "summary", "raw_text", "last_verified_at",
+                    }
+                }])
+                ingested.append({"entity": entity, "url": url, "category": category})
+            except Exception as e:
+                errors.append(f"Ingest failed for {url}: {e}")
+
+    status = "ok" if not errors else ("partial" if ingested or new_findings else "error")
+    return {
+        "status": status,
+        "topic": topic,
+        "existing_entities": list(existing_entities.keys()),
+        "new_findings": len(new_findings),
+        "ingested": len(ingested),
+        "ingested_detail": ingested,
+        "errors": errors,
+    }
+
+
+# ---------------------------------------------------------------------------
+# summarize_topic_updates
+# ---------------------------------------------------------------------------
+
+async def tool_summarize_topic_updates(input_data: dict) -> dict:
+    """
+    Reads topic_events for the given topic/window, compares entity statuses,
+    and produces a structured weekly report.
+    Input:  { topic, since (optional ISO date) }
+    Output: { topic, period, report (text), sections (structured) }
+    """
+    topic = input_data.get("topic", "").strip()
+    since = input_data.get("since")
+
+    if not topic:
+        raise RuntimeError("topic is required")
+    if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
+        raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required")
+
+    if not since:
+        from datetime import timedelta
+        since = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    period_end = datetime.utcnow().strftime("%Y-%m-%d")
+    period_start = since[:10]
+
+    try:
+        all_events = await _sb_get(
+            "topic_events",
+            {"topic": f"eq.{topic}", "select": "*", "order": "entity.asc,created_at.asc"}
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch topic events: {e}")
+
+    try:
+        recent_events = await _sb_get(
+            "topic_events",
+            {
+                "topic": f"eq.{topic}",
+                "last_verified_at": f"gte.{since}",
+                "select": "*",
+                "order": "entity.asc,created_at.desc",
+            }
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch recent events: {e}")
+
+    entity_history: dict[str, list[dict]] = {}
+    for ev in all_events:
+        entity_history.setdefault(ev["entity"], []).append(ev)
+
+    # Aggregate all recent rows per entity, picking the most official representative.
+    # Source priority: official_primary > official_secondary > secondary > discovery
+    _SOURCE_RANK = {"official_primary": 0, "official_secondary": 1, "secondary": 2, "discovery": 3}
+
+    recent_by_entity: dict[str, dict] = {}
+    for ev in recent_events:
+        eid = ev["entity"]
+        if eid not in recent_by_entity:
+            recent_by_entity[eid] = ev
+        else:
+            # Replace if this row has a higher-priority source type
+            existing_rank = _SOURCE_RANK.get(recent_by_entity[eid].get("source_type", "discovery"), 3)
+            new_rank = _SOURCE_RANK.get(ev.get("source_type", "discovery"), 3)
+            if new_rank < existing_rank:
+                recent_by_entity[eid] = ev
+
+    # For each entity, also determine the canonical category from its most official row
+    # (fixes per-row category inconsistency: e.g. sp-pl-107-2023 getting B from one URL)
+    entity_best_category: dict[str, str] = {}
+    for eid, rep_ev in recent_by_entity.items():
+        entity_best_category[eid] = rep_ev.get("category", "?")
+
+    config = TOPIC_CONFIG.get(topic, {})
+    watchlist = config.get("watchlist", [])
+
+    developments: list[dict] = []
+    baselines: list[dict] = []
+    no_change: list[str] = []
+    unverified: list[dict] = []
+
+    # Entities whose oldest row is within the current window have no prior history.
+    # Detect this by checking whether ALL rows for the entity fall within the window.
+    since_dt = since  # ISO string, comparable lexicographically with created_at strings
+
+    for entity, recent_ev in recent_by_entity.items():
+        history = entity_history.get(entity, [])
+        # prev = latest event strictly before the representative recent row
+        prev_events = [e for e in history if e["created_at"] < recent_ev["created_at"]]
+        # A true prior state only exists if there are rows older than the current window
+        has_prior_history = any(e["created_at"] < since_dt for e in history)
+        prev_status = prev_events[-1]["status"] if (prev_events and has_prior_history) else None
+        new_status = recent_ev["status"]
+        source_type = recent_ev.get("source_type", "discovery")
+        is_official = recent_ev.get("official_source", False)
+
+        has_any_official = any(
+            ev.get("official_source", False)
+            for ev in recent_events
+            if ev["entity"] == entity
+        )
+
+        if not has_any_official:
+            unverified.append({
+                "entity": entity,
+                "summary": recent_ev.get("summary", ""),
+                "source_url": recent_ev.get("source_url", ""),
+            })
+            continue
+
+        if not has_prior_history:
+            # First-ever observation: report as BASELINE, not as a change
+            baselines.append({
+                "entity": entity,
+                "category": entity_best_category[entity],
+                "status": new_status,
+                "source_url": recent_ev.get("source_url", ""),
+                "source_type": source_type,
+                "summary": recent_ev.get("summary", ""),
+                "official_source": is_official,
+            })
+        elif new_status != prev_status:
+            developments.append({
+                "change_type": "CHANGED",
+                "entity": entity,
+                "category": entity_best_category[entity],
+                "previous_status": prev_status,
+                "new_status": new_status,
+                "event_date": recent_ev.get("event_date"),
+                "source_url": recent_ev.get("source_url", ""),
+                "source_type": source_type,
+                "summary": recent_ev.get("summary", ""),
+                "official_source": is_official,
+            })
+        # else: UNCHANGED — falls to no_change below
+
+    for wl_entity in watchlist:
+        if wl_entity not in recent_by_entity:
+            no_change.append(wl_entity)
+        elif wl_entity in {b["entity"] for b in baselines}:
+            pass  # baseline section covers it
+        elif all(
+            e["created_at"] >= since_dt
+            for e in entity_history.get(wl_entity, [])
+        ):
+            pass  # also baseline, already captured
+        else:
+            rep = recent_by_entity[wl_entity]
+            if rep["status"] == (entity_history.get(wl_entity, [{}])[-1] or {}).get("status"):
+                no_change.append(wl_entity)
+
+    lines = [
+        "BRAZILIAN RBC WEEKLY UPDATE" if topic == "brazil-rbc" else f"{topic.upper()} WEEKLY UPDATE",
+        f"Period: {period_start} -> {period_end}",
+        "",
+    ]
+
+    if baselines:
+        lines.append("BASELINE ESTABLISHED")
+        lines.append("")
+        for i, b in enumerate(baselines, 1):
+            lines.append(f"{i}. [{b['entity']}] — baseline status recorded: {b['status']}")
+            lines.append(f"   Category: {b['category']}")
+            lines.append(f"   Source: {b['source_url']}")
+            lines.append(f"   Official source: {'YES' if b['official_source'] else 'NO — requires verification'}")
+            lines.append(f"   Summary: {b['summary'][:300]}")
+            lines.append("")
+
+    if developments:
+        lines.append("STATUS CHANGES")
+        lines.append("")
+        for i, d in enumerate(developments, 1):
+            lines.append(f"{i}. [{d['entity']}]")
+            lines.append(f"   Category: {d['category']}")
+            lines.append(f"   Previous status: {d['previous_status']}")
+            lines.append(f"   New status: {d['new_status']}")
+            if d.get("event_date"):
+                lines.append(f"   Event date: {d['event_date']}")
+            lines.append(f"   Source: {d['source_url']}")
+            lines.append(f"   Official source: {'YES' if d['official_source'] else 'NO — requires verification'}")
+            lines.append(f"   Summary: {d['summary'][:300]}")
+            lines.append("")
+    elif not baselines:
+        lines += ["STATUS CHANGES", "", "No status changes found in this period.", ""]
+
+    lines.append("NO SIGNIFICANT CHANGE")
+    lines.append("")
+    if no_change:
+        for eid in no_change:
+            lines.append(f"- {eid} — no new official movement found in the sources checked during this cycle.")
+    else:
+        lines.append("- All watchlist entities had activity this period.")
+    lines.append("")
+
+    lines.append("WATCHLIST")
+    lines.append("")
+    for eid in watchlist:
+        lines.append(f"- {eid}")
+    lines.append("")
+
+    if unverified:
+        lines.append("UNVERIFIED LEADS")
+        lines.append("")
+        for u in unverified:
+            lines.append(f"- {u['entity']}: {u['summary'][:200]}")
+            lines.append(f"  Source: {u['source_url']}")
+            lines.append("  Status: Unverified lead — official confirmation not yet located.")
+        lines.append("")
+
+    return {
+        "status": "ok",
+        "topic": topic,
+        "period": {"start": period_start, "end": period_end},
+        "report": "\n".join(lines),
+        "sections": {
+            "baselines": baselines,
+            "developments": developments,
+            "no_change": no_change,
+            "watchlist": watchlist,
+            "unverified": unverified,
+        },
+    }
+
+
 TOOLS: dict[str, dict] = {
     tool["name"]: {
         "meta": tool,
@@ -631,6 +1264,8 @@ TOOLS: dict[str, dict] = {
             "forget": _tool_forget,
             "search_knowledge_db": tool_search_knowledge_db,
             "ingest_media": tool_ingest_media,
+            "research_topic": tool_research_topic,
+            "summarize_topic_updates": tool_summarize_topic_updates,
         }[tool["name"]],
     }
     for tool in CARD["tools"]

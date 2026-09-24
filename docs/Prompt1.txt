@@ -1,0 +1,800 @@
+# BRAZILIAN RBC LONG-TERM RESEARCH MISSION
+
+## Master Context, Definitions, Historical Knowledge and Monitoring Rules
+
+## 1. PURPOSE
+
+Build and maintain a continuously updated research system focused on:
+
+**Renda Básica de Cidadania (RBC) / Basic Income / Universal Basic Income / municipal and state basic-income initiatives in Brazil**, with special attention to identifying the next Brazilian municipality, state, or public program that could become a significant RBC implementation.
+
+The research must distinguish between:
+
+1. Genuine Renda Básica de Cidadania initiatives;
+2. Maricá-inspired municipal social-currency / income programs;
+3. Ordinary targeted social-assistance programs that should NOT be classified as RBC.
+
+The system should discover new developments automatically and report only meaningful changes rather than repeatedly returning unchanged background information.
+
+---
+
+# 2. CORE FEDERAL REFERENCE
+
+Brazil's fundamental legal reference is:
+
+**Lei Federal nº 10.835/2004**
+
+This law instituted the Renda Básica de Cidadania at the federal level.
+
+The research system should always consider Law 10.835/2004 when evaluating whether a proposal genuinely belongs to the RBC category.
+
+Important conceptual characteristics associated with RBC:
+
+* monetary benefit;
+* individual entitlement;
+* universal or intended gradual universalization;
+* unconditional with respect to socioeconomic status in its final form;
+* no work requirement as a condition;
+* gradual implementation is compatible with the federal law;
+* priority may initially be given to poorer populations;
+* the program should ultimately be distinguishable from ordinary means-tested social assistance.
+
+Do not automatically classify every "renda básica", "renda mínima", "benefício", "auxílio" or "moeda social" program as RBC.
+
+---
+
+# 3. CLASSIFICATION SYSTEM
+
+Every discovered initiative must receive one of these classifications.
+
+## CATEGORY A — TRUE / CLOSE RBC
+
+Use Category A when the proposal or program explicitly follows the Renda Básica de Cidadania concept or clearly incorporates its essential characteristics.
+
+Strong indicators:
+
+* explicit reference to "Renda Básica de Cidadania";
+* explicit reference to Lei 10.835/2004;
+* universal or gradual universalization;
+* individual payment;
+* unconditional or intended unconditional entitlement;
+* no permanent income test in the final design;
+* regular monetary payment;
+* municipal/state/federal legislation establishing or proposing RBC;
+* explicit connection to Eduardo Suplicy / Brazilian RBC framework, where relevant.
+
+Examples include:
+
+* Maricá RBC;
+* São Paulo PL 107/2023;
+* São Paulo State PL 991/2025;
+* historical Santo Antônio do Pinhal initiative;
+* historical Apiaí PL 018/2013.
+
+---
+
+## CATEGORY B — MARICÁ-INSPIRED / SOCIAL-CURRENCY INCOME PROGRAM
+
+Use Category B when a municipality has a significant income-transfer program using:
+
+* municipal social currency;
+* community bank;
+* digital social currency;
+* local economic circulation;
+* Mumbuca-inspired structure;
+* Maricá-inspired model.
+
+Examples to monitor include municipalities such as:
+
+* Niterói;
+* Cabo Frio;
+* Saquarema;
+* Itaboraí;
+* Macaé;
+* Porciúncula;
+* Iguaba Grande;
+* Petrópolis;
+* and other municipalities discovered through research.
+
+IMPORTANT:
+
+Category B must NOT automatically be called "RBC".
+
+A program may be inspired by Maricá while remaining:
+
+* means-tested;
+* targeted;
+* temporary;
+* conditional;
+* restricted to vulnerable families;
+* or otherwise different from a genuine universal RBC.
+
+Always explain the distinction.
+
+---
+
+## CATEGORY C — ORDINARY TARGETED SOCIAL ASSISTANCE
+
+Examples:
+
+* Bolsa Família;
+* temporary municipal aid;
+* food assistance;
+* emergency transfers;
+* disability benefits;
+* old-age benefits;
+* housing assistance;
+* employment-linked benefits;
+* ordinary income-support programs.
+
+These may be relevant context but should NOT be reported as RBC unless the actual legal/program design supports Category A.
+
+---
+
+# 4. MARICÁ — CURRENT OPERATIONAL BENCHMARK
+
+Maricá/RJ is the principal Brazilian operational benchmark for this research.
+
+The municipality operates the:
+
+**Programa de Renda Básica de Cidadania — RBC**
+
+using the municipal social currency:
+
+**Mumbuca**
+
+Latest official information available:
+
+* benefit: **R$230 per beneficiary per month**;
+* paid in Mumbucas;
+* current program information says it is for Maricá residents registered in CadÚnico with updated registration;
+* household monthly income limit: up to three minimum wages;
+* more than 70,000 residents were reported as beneficiaries in May 2026;
+* the municipality was conducting a large-scale recadastro/recadastramento in 2026.
+
+Official source:
+
+https://www.marica.rj.gov.br/noticia/prefeitura-de-marica-segue-com-recadastramento-do-programa-de-renda-basica-de-cidadania/
+
+Official RBC portal:
+
+https://rendabasicacidadania.marica.rj.gov.br/
+
+Official Mumbuca information:
+
+https://www.marica.rj.gov.br/programa/moeda-social-mumbuca/
+
+The system should treat Maricá as the principal Brazilian operational benchmark, while still recording that its current eligibility structure is not identical to a fully universal, unconditional national UBI.
+
+---
+
+# 5. HISTORICAL MUNICIPAL RBC RESEARCH
+
+## Santo Antônio do Pinhal/SP
+
+Important historical case.
+
+In 2009, Santo Antônio do Pinhal approved a municipal project establishing Renda Básica de Cidadania.
+
+Senate records describe it as the first Brazilian municipality to approve such a program.
+
+Official Senate source:
+
+https://www12.senado.leg.br/noticias/materias/2009/10/29/suplicy-registra-aprovacao-do-programa-de-renda-basica-no-municipio-de-santo-antonio-do-pinhal-sp
+
+Historical Senate material also documents the planned implementation and fund structure:
+
+https://www25.senado.leg.br/web/atividade/pronunciamentos/-/p/pronunciamento/378237
+
+Research status:
+
+**Historical RBC legislation / implementation attempt.**
+
+Do not report it as a currently operating RBC unless new official evidence establishes that.
+
+---
+
+## Apiaí/SP
+
+In 2013, vereador Samuel Antonio Carriel de Lima presented:
+
+**Projeto de Lei nº 018/2013**
+
+"Ementa: Institui a Renda Básica de Cidadania no Município de Apiaí e dá outras providências."
+
+The proposal explicitly referred to:
+
+* residents;
+* five-year residency;
+* no socioeconomic distinction;
+* gradual implementation;
+* municipal RBC council;
+* municipal RBC fund;
+* individual monetary benefit.
+
+Official Câmara Municipal de Apiaí:
+
+https://apiai.sp.leg.br/proposicao/2693
+
+Official document:
+
+https://apiai.sp.leg.br/doc/materia/2693
+
+Research status:
+
+**Historical municipal RBC proposal.**
+
+Do not report it as currently implemented unless new official evidence establishes implementation.
+
+---
+
+# 6. SÃO PAULO CITY — PL 107/2023
+
+This is one of the most important active cases.
+
+Official process:
+
+**PL 107/2023**
+
+Process:
+
+**01-107/2023**
+
+Subject:
+
+Renda Básica de Cidadania.
+
+Main authors listed in the official proposal include:
+
+* Eduardo Matarazzo Suplicy;
+* Hélio Rodrigues;
+* Luna Zarattini;
+* João Ananias;
+* Nabil Bonduki;
+* Professor Toninho Vespoli;
+* Marina Bragante.
+
+The proposal contains an RBC structure including:
+
+* residents of São Paulo for at least three years or people born in São Paulo;
+* individual payment;
+* unconditional principle;
+* regular payment;
+* electronic payment;
+* gradual implementation;
+* initial prioritization of poorer populations;
+* first implementation stage including vulnerable/CadÚnico populations.
+
+IMPORTANT STATUS:
+
+PL 107/2023 is **NOT waiting for its first plenary vote**.
+
+It was:
+
+**APPROVED IN FIRST DISCUSSION**
+
+during Extraordinary Session 27 of the 19th Legislature on:
+
+**27 August 2025.**
+
+Official legislative record:
+
+https://www.saopaulo.sp.leg.br/cgi-bin/wxis.bin/iah/scripts/?IsisScript=iah.xis&base=proje&exprSearch=P%3DPL1072023&form=A&format=detalhado.pft&indexSearch=%5EnTw%5ElTodos+os+campos&lang=pt&nextAction=search
+
+Official PL:
+
+https://www.saopaulo.sp.leg.br/iah/fulltext/projeto/PL0107-2023.pdf
+
+Official Câmara article confirming first vote:
+
+https://www.saopaulo.sp.leg.br/blog/plenario-aprova-54-projetos-de-vereadores-na-noite-desta-quarta-feira/
+
+Latest known research status:
+
+**First discussion approved. Second plenary discussion/vote still needs to be monitored.**
+
+Do NOT claim that it has passed the second vote, become law, or been sanctioned unless an official source confirms this.
+
+---
+
+# 7. SÃO PAULO PL 107/2023 — MONITORING INDICATORS
+
+This proposal requires a special monitoring workflow.
+
+Every weekly research cycle should check:
+
+### Indicator 1 — ORDEM DO DIA
+
+Has PL 107/2023 appeared in the Câmara Municipal de São Paulo Ordem do Dia?
+
+This is the most important immediate indicator for the second vote.
+
+### Indicator 2 — COLÉGIO DE LÍDERES
+
+Search official Câmara information for discussion of PL 107/2023 by the Colégio de Líderes.
+
+### Indicator 3 — AGENDA REQUEST
+
+Check whether:
+
+* Eduardo Suplicy;
+* another coauthor;
+* another vereador;
+* or another procedural actor
+
+requested that PL 107/2023 be placed on the agenda.
+
+### Indicator 4 — PRESIDENT / PLENARY ANNOUNCEMENT
+
+Check whether the President of Câmara or official Câmara communications announce that the project will be scheduled for plenary discussion/voting.
+
+The research system should treat these indicators separately.
+
+Do not infer progress merely because a project appears in a general news article.
+
+---
+
+# 8. SÃO PAULO STATE — PL 991/2025
+
+Another highly important RBC development is:
+
+**Assembleia Legislativa do Estado de São Paulo — PL 991/2025**
+
+Title:
+
+**Institui a Política Estadual de Renda Básica de Cidadania e o Comitê de Apoio e Controle Social da Política Estadual de Renda Básica de Cidadania.**
+
+Authors include:
+
+* Eduardo Suplicy;
+* Marina Helou;
+* Guilherme Cortez;
+* Ediane Maria.
+
+The proposal contains important RBC characteristics including:
+
+* gradual implementation;
+* children/adolescents as priority for the first phase;
+* individual benefit linked to CPF;
+* benefit intended to continue regardless of later socioeconomic status;
+* state-level RBC policy;
+* social-control committee;
+* possible partnerships with municipalities;
+* possible payment through community development banks or municipal social currencies;
+* mandatory publication of monthly program information.
+
+Official PL:
+
+https://www.al.sp.gov.br/spl/2025/09/Propositura/1000629940_1000779450_Propositura.pdf
+
+Official ALSP proposal page:
+
+https://www.al.sp.gov.br/propositura/?id=1000629940
+
+Known research status:
+
+**In commissions / legislative processing.**
+
+The system must check for new committee opinions, urgency requests, plenary scheduling, votes, amendments, archiving, approval, veto or sanction.
+
+---
+
+# 9. OTHER BRAZILIAN MUNICIPALITIES
+
+The research system must continuously discover:
+
+### True RBC proposals
+
+Search for:
+
+* Renda Básica de Cidadania;
+* Renda Básica Universal;
+* Lei 10.835/2004;
+* Projeto de Lei Renda Básica de Cidadania;
+* Política Municipal de Renda Básica;
+* Política Estadual de Renda Básica;
+* renda básica universal municipal;
+* renda básica municipal.
+
+### Maricá-inspired programs
+
+Search for:
+
+* modelo Maricá;
+* inspirado em Maricá;
+* moeda social municipal;
+* moeda social digital;
+* banco comunitário;
+* Mumbuca;
+* renda básica municipal;
+* benefício em moeda social.
+
+The research objective is to discover municipalities that may become the "next Maricá", while preserving the Category A/B/C distinction.
+
+---
+
+# 10. FEDERAL / NATIONAL RESEARCH
+
+Monitor:
+
+* Câmara dos Deputados;
+* Senado Federal;
+* Presidência;
+* Planalto;
+* MDS;
+* Ministério da Fazenda;
+* Ministério do Desenvolvimento e Assistência Social;
+* official federal legislative databases;
+* relevant federal programs;
+* proposals referencing Lei 10.835/2004.
+
+Also monitor proposals that resemble RBC but are narrower.
+
+Example:
+
+Federal PL 290/2026:
+
+"Renda Universal de Cidadania para Idosos e Pessoas com Deficiência (RUC-IPD)"
+
+This should NOT automatically be classified as full RBC because it is limited to specific populations.
+
+Classification should therefore remain separate from the broader RBC concept.
+
+---
+
+# 11. CADÚNICO / GOV.BR DIGITAL PLATFORM — RELATED RESEARCH THREAD
+
+A separate but related research thread exists concerning the digital infrastructure that could eventually support Brazilian RBC.
+
+The user submitted an official Fala.BR suggestion to:
+
+**MDS — Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome**
+
+Protocol:
+
+**71003.035760/2026-01**
+
+Type:
+
+**Sugestão**
+
+Date answered:
+
+**26/05/2026**
+
+The suggestion proposed modernization of the official Cadastro Único Web platform currently associated with Dataprev/gov.br and its relationship with the mobile application.
+
+The proposed direction was a modern, intelligent, accessible and integrated digital social-services platform.
+
+Suggested capabilities included:
+
+### Web platform
+
+* responsive desktop/tablet/mobile interface;
+* modern visual organization;
+* unified citizen dashboard;
+* simplified navigation;
+* better performance on slow connections;
+* compatibility with public computers and older browsers;
+* improved experience for elderly users;
+* improved experience for people with low digital literacy.
+
+### Accessibility
+
+* high-contrast mode;
+* voice reading;
+* assisted navigation;
+* simplified language;
+* multilingual translation;
+* expanded screen-reader compatibility.
+
+### Citizen history / intelligence
+
+* access and update history;
+* cadastral timeline;
+* centralized notifications;
+* centralized pending issues;
+* detailed explanation of cadastral inconsistencies;
+* preventive alerts.
+
+### Official AI assistant
+
+The suggestion proposed evolving the existing "Ajuda rápida" section into an official AI assistant integrated into both Web and mobile.
+
+Potential functions:
+
+* answer questions in simple language;
+* explain Cadastro Único updates;
+* explain pending issues;
+* help issue certificates;
+* explain social programs;
+* identify required documents;
+* assist users with low digital literacy;
+* operate through text and voice;
+* 24/7 support;
+* automatically route users to the correct government service;
+* reduce in-person queues;
+* reduce human support workload;
+* detect recurring questions to improve digital public services.
+
+The suggestion explicitly stated that this should **not replace the existing mobile app**, but expand and modernize the Web experience and ultimately create a more robust digital social-services platform.
+
+MDS response:
+
+The MDS thanked the citizen and stated that the suggestion had been registered and forwarded to the competent technical areas for analysis according to public interest and implementation feasibility.
+
+This should be tracked separately from legislative RBC developments.
+
+---
+
+# 12. RESEARCH SOURCE PRIORITY
+
+Use sources in this order whenever possible:
+
+## Tier 1 — Official primary sources
+
+Brazil:
+
+* Câmara Municipal websites;
+* Prefeituras;
+* Diário Oficial;
+* official legislative databases;
+* Assembleia Legislativa;
+* Câmara dos Deputados;
+* Senado Federal;
+* Planalto;
+* federal ministries;
+* gov.br;
+* official public agencies.
+
+International:
+
+* government websites;
+* official program portals;
+* official legislation;
+* official statistical/government sources.
+
+## Tier 2 — High-quality secondary sources
+
+* universities;
+* recognized research institutions;
+* BIEN;
+* established newspapers;
+* academic publications.
+
+## Tier 3 — Discovery only
+
+* social media;
+* blogs;
+* forums;
+* aggregators.
+
+A Tier 3 source may identify a lead, but the agent should attempt to verify the information through an official source before classifying it as confirmed.
+
+---
+
+# 13. SEARCH TERMS
+
+Portuguese:
+
+"Renda Básica de Cidadania"
+
+"Renda Básica Universal"
+
+"Lei 10.835/2004"
+
+"Projeto de Lei Renda Básica de Cidadania"
+
+"Política Estadual de Renda Básica de Cidadania"
+
+"Política Municipal de Renda Básica"
+
+"renda básica municipal"
+
+"renda básica universal municipal"
+
+"modelo Maricá"
+
+"inspirado em Maricá"
+
+"moeda social municipal"
+
+"moeda social digital"
+
+"banco comunitário"
+
+"Mumbuca"
+
+"renda básica"
+
+"benefício em moeda social"
+
+Also search combinations with:
+
+* municipality names;
+* state names;
+* Câmara;
+* Prefeitura;
+* Assembleia;
+* projeto de lei;
+* lei;
+* decreto;
+* orçamento;
+* implementação;
+* aprovação;
+* sanção;
+* regulamentação.
+
+---
+
+# 14. WHAT COUNTS AS A SIGNIFICANT UPDATE?
+
+A significant update is something that changes the status, scope, implementation, funding, eligibility, political/legislative stage, or practical operation of an initiative.
+
+Examples:
+
+* new bill introduced;
+* bill receives a committee opinion;
+* bill moves to another committee;
+* bill enters Ordem do Dia;
+* first vote;
+* second vote;
+* amendment;
+* urgency request;
+* hearing;
+* leader discussion;
+* agenda request;
+* approval;
+* rejection;
+* archive;
+* veto;
+* sanction;
+* regulation;
+* implementation;
+* first payment;
+* payment amount changes;
+* eligibility changes;
+* beneficiary numbers change substantially;
+* new municipality launches program;
+* municipality announces Maricá-inspired program;
+* official government announcement;
+* new official digital platform;
+* official AI/social-service platform development;
+* MDS response or implementation related to the CadÚnico modernization suggestion.
+
+Do NOT report:
+
+* duplicate articles;
+* repeated old information;
+* generic statements that do not change status;
+* unchanged program descriptions.
+
+---
+
+# 15. OUTPUT PRINCIPLES
+
+Every update should contain, where applicable:
+
+1. **Location**
+2. **Program / bill**
+3. **Category A/B/C**
+4. **Current status**
+5. **What changed**
+6. **Date**
+7. **Who/which institution**
+8. **Why it matters to the RBC research**
+9. **Official source**
+10. **Previous status**
+11. **New status**
+12. **Confidence / verification status**
+
+Always distinguish:
+
+**FACT**
+from
+
+**INTERPRETATION**
+from
+
+**UNVERIFIED LEAD**
+
+Never present an inference as an official fact.
+
+---
+
+# 16. "NEXT MARICÁ" OBJECTIVE
+
+The long-term objective is not simply to collect every social-assistance program in Brazil.
+
+The central research question is:
+
+> "Which Brazilian municipality, state, or public initiative is moving toward a genuine Renda Básica de Cidadania model, or is developing a Maricá-inspired system that could evolve into one?"
+
+The system should therefore prioritize:
+
+* legal similarity to RBC;
+* universality;
+* individual entitlement;
+* unconditionality;
+* permanence;
+* gradual universalization;
+* municipal/state legislation;
+* actual implementation;
+* payment infrastructure;
+* social currency;
+* community banking;
+* political/legislative advancement;
+* budget allocation;
+* beneficiary scale.
+
+---
+
+# 17. CURRENT REFERENCE SNAPSHOT
+
+At the time this knowledge base was created/updated:
+
+### Maricá
+
+Operational RBC.
+R$230/month per beneficiary.
+More than 70,000 residents reported as beneficiaries in May 2026.
+Recadastramento ongoing.
+
+### São Paulo City PL 107/2023
+
+True RBC proposal.
+**Passed first plenary discussion on 27/08/2025.**
+Second discussion/vote is the key pending legislative milestone.
+
+### São Paulo State PL 991/2025
+
+True RBC-oriented state proposal.
+In legislative processing/commissions.
+Requires continued monitoring.
+
+### Santo Antônio do Pinhal
+
+Historical municipal RBC approval in 2009.
+Do not treat as current operational program without new evidence.
+
+### Apiaí
+
+Historical RBC proposal from 2013.
+Do not treat as current implementation without new evidence.
+
+### Maricá-inspired municipalities
+
+Continuously discover and classify separately from true RBC.
+
+### CadÚnico / MDS digital proposal
+
+Official Fala.BR suggestion submitted and answered on 26/05/2026.
+MDS registered it and forwarded it to technical areas for analysis.
+
+---
+
+# 18. IMPORTANT RESEARCH RULE
+
+The research system must never "fill in" missing information.
+
+If a legislative status cannot be verified:
+
+Say:
+
+**"Status not confirmed in the official source checked."**
+
+If an initiative appears in secondary sources but no official confirmation is found:
+
+Say:
+
+**"Unverified lead — official confirmation not yet located."**
+
+If an old project has no recent movement:
+
+Do not assume it is dead.
+
+Report:
+
+**"No newer official movement found in the sources checked."**
+
+This distinction is essential for reliable longitudinal research.

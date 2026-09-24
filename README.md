@@ -44,6 +44,8 @@ hello-agent-alp-kiro/
 | 9 | `forget` | Delete a specific memory key or clear the entire session |
 | 10 | `search_knowledge_db` | Semantic search over Supabase (pgvector) — covers all ingested content |
 | 11 | `ingest_media` | **Analyzer pipeline** — routes by file type: audio/video → Whisper, PDF → pdfplumber, DOCX → python-docx, image → Gemini Vision, text/md → direct read. Chunks, embeds, stores in Supabase. |
+| 12 | `research_topic` | Longitudinal topic research — loads existing entity state, searches the web, matches results to known entities, ingests only new/changed evidence into `topic_events`. |
+| 13 | `summarize_topic_updates` | Weekly digest — compares each entity's current status to its prior state, produces a structured report with BASELINE / STATUS CHANGES / NO CHANGE / UNVERIFIED sections. |
 
 ---
 
@@ -221,6 +223,86 @@ For the deployed version replace the URL with `https://hello-agent-alp-kiro.onre
 - They are **never** returned by the GitHub API
 - They are injected **only** into the workflow runner at runtime
 - They never appear in `agent.alp.json`, in logs, or in any config file
+
+---
+
+## Topic Research Pipeline (`research_topic` + `summarize_topic_updates`) — v3.0.0
+
+A longitudinal research system that tracks named entities over time, detects status changes, and produces a structured weekly digest. `brazil-rbc` is the first supported topic.
+
+### What is a "topic"?
+
+A topic is a named research domain (e.g. `brazil-rbc`). Each topic has:
+- a set of **search terms** used to discover new evidence
+- a **watchlist** of high-priority entity ids to monitor explicitly
+- a **known_entities** map of entity ids → alias patterns for matching
+
+### Entity-tracking model
+
+Every ingested finding is stored as a row in `topic_events` with:
+
+| Field | Description |
+|---|---|
+| `topic` | e.g. `brazil-rbc` |
+| `entity` | normalized id, e.g. `sp-pl-107-2023`, or `discovery-XXXX` for unmatched results |
+| `status` | extracted legislative/program stage: `introduced`, `sanctioned`, `operational`, `discovered`, etc. |
+| `event_date` | date of the event if extractable from the source |
+| `source_url` | canonical URL of the evidence |
+| `source_type` | `official_primary` / `official_secondary` / `secondary` / `discovery` |
+| `official_source` | boolean — true if from a government/legislative domain |
+| `last_verified_at` | timestamp of last check |
+
+Rows are **append-only** — prior states are never overwritten, preserving a full timeline per entity.
+
+### Supabase setup
+
+Run `db/migrations/002_topic_research.sql` in the Supabase SQL Editor (same as `001_knowledge.sql`). It creates the `topic_events` table and four indexes. It is **additive and safe** — it does not touch `knowledge_chunks`.
+
+```sql
+-- In Supabase SQL Editor:
+-- 1. Paste and run db/migrations/001_knowledge.sql  (if not already done)
+-- 2. Paste and run db/migrations/002_topic_research.sql
+```
+
+### Weekly GitHub Action
+
+`.github/workflows/topic-research-weekly.yml` runs every **Monday at 08:00 UTC** (`cron: '0 8 * * 1'`). It also supports `workflow_dispatch` for manual runs.
+
+Three steps: `research_topic` → `summarize_topic_updates` → deliver report.
+
+Delivery channel is controlled by the `DELIVERY_CHANNEL` repo variable:
+
+| `DELIVERY_CHANNEL` | Secrets required |
+|---|---|
+| `email` (default) | `RESEND_API_KEY`, `REPORT_EMAIL_TO` |
+| `slack` | `SLACK_WEBHOOK_URL` |
+
+### curl examples
+
+```bash
+# Run a research cycle for brazil-rbc
+curl -X POST http://localhost:8000/tools/research_topic \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"topic": "brazil-rbc"}}'
+
+# Get the weekly digest
+curl -X POST http://localhost:8000/tools/summarize_topic_updates \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"topic": "brazil-rbc"}}'
+
+# Re-research a specific window
+curl -X POST http://localhost:8000/tools/summarize_topic_updates \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"topic": "brazil-rbc", "since": "2026-09-01"}}'
+```
+
+### Known limitations
+
+**a. JS-rendered legislative tracking pages** — `camara.leg.br/proposicoesWeb/fichadetramitacao` pages are JavaScript-rendered. `_fetch_page_text` receives only the JS scaffolding HTML, not the rendered tramitação table, so Gemini cannot extract a real legislative stage and falls back to `status: discovered` for those rows. Future fix: add a Playwright/Splash fetch path for JS-heavy domains.
+
+**b. PDF-only bill text** — `sp-pl-107-2023`'s baseline status is `discovered` because the actual bill text lives in a PDF (`saopaulo.sp.leg.br/iah/fulltext/projeto/PL0107-2023.pdf`) which the page fetcher intentionally skips (PDFs are handled by the separate `ingest_media` pipeline). The diff logic will surface a real `CHANGED` entry once a fetchable HTML page reflects legislative movement.
+
+> The original domain brief (`Prompt1.txt`) and build specification (`Prompt2.txt`, `Prompt3.txt`) live in `docs/` for reference.
 
 ---
 
