@@ -529,3 +529,103 @@ END OF TOOLS DOCUMENTATION
 Generated: 2026-06-11
 Project Version: 1.5.0
 Total Tools Documented: 11
+
+================================================================================
+
+12. RESEARCH_TOPIC
+    ───────────────────────────────────────────────────────────────────────
+    Description: Longitudinal topic research tool. Loads existing entity
+                 knowledge from Supabase, searches the web for new evidence,
+                 matches results to known entities, classifies findings
+                 (Category A/B/C for brazil-rbc), and ingests only genuinely
+                 new or changed evidence. Never overwrites prior status rows —
+                 always appends to preserve full history.
+    Type: Read-Write (Modifies State)
+    Endpoint: /tools/research_topic
+
+    Input Parameters:
+      - topic (string, required): e.g. "brazil-rbc"
+      - since (string, optional): ISO date — limit search window
+      - scope (string, optional): reserved for future scoping
+      - force_full_scan (boolean, optional, default: false): re-ingest known URLs
+
+    Output:
+      - status (string): "ok" | "partial" | "error"
+      - topic (string): topic searched
+      - existing_entities (array): entity ids already in the knowledge base
+      - new_findings (integer): number of new results found
+      - ingested (integer): number of new rows written to topic_events
+      - ingested_detail (array): [{entity, url, category}]
+      - errors (array): per-step error messages if any
+
+    Use Case: Weekly RBC research cycle — discovers new legislative events,
+              municipal programs, and Maricá-inspired initiatives.
+    Example: research_topic(topic="brazil-rbc")
+    Example: research_topic(topic="brazil-rbc", force_full_scan=true)
+
+================================================================================
+
+13. SUMMARIZE_TOPIC_UPDATES
+    ───────────────────────────────────────────────────────────────────────
+    Description: Reads topic_events for the given topic and time window,
+                 compares each entity's newest status to its previous stored
+                 status, and produces a structured weekly report. Classifies
+                 each entity as NEW / CHANGED / UNCHANGED / UNVERIFIED.
+                 Only surfaces entities where something actually changed, plus
+                 explicit "no movement found" lines for watchlist entities.
+                 Never invents or infers a status not verified from a source.
+    Type: Read-only
+    Endpoint: /tools/summarize_topic_updates
+
+    Input Parameters:
+      - topic (string, required): e.g. "brazil-rbc"
+      - since (string, optional): ISO date — defaults to last 7 days
+
+    Output:
+      - status (string): "ok" | "error"
+      - topic (string)
+      - period (object): { start, end }
+      - report (string): full formatted weekly report text
+      - sections (object):
+          - developments (array): NEW/CHANGED entities with full detail
+          - no_change (array): watchlist entity ids with no recent movement
+          - watchlist (array): full watchlist for this topic
+          - unverified (array): discovery-only leads lacking official confirmation
+
+    Use Case: Produce the weekly Brazilian RBC digest — what changed, what
+              didn't, what needs watching, what is unverified.
+    Example: summarize_topic_updates(topic="brazil-rbc")
+    Example: summarize_topic_updates(topic="brazil-rbc", since="2026-09-01")
+
+================================================================================
+TOOL CATEGORIES (updated)
+================================================================================
+
+TOPIC RESEARCH TOOLS (2):
+  • research_topic
+  • summarize_topic_updates
+  Purpose: Longitudinal topic monitoring, change detection, weekly digest
+
+================================================================================
+SECRETS REQUIRED FOR NEW TOOLS
+================================================================================
+
+topic_events Supabase table:
+  - Run db/migrations/002_topic_research.sql in Supabase SQL Editor
+  - Uses existing SUPABASE_URL and SUPABASE_KEY secrets
+
+Weekly GitHub Action (topic-research-weekly.yml):
+  - Schedule: Every Monday at 08:00 UTC (cron: '0 8 * * 1')
+  - DELIVERY_CHANNEL repo variable: "email" (default) or "slack"
+  - RBC_TOPIC repo variable: "brazil-rbc" (default)
+
+  For email delivery (Resend):
+    - RESEND_API_KEY  (GitHub Secret) — free at resend.com
+    - REPORT_EMAIL_TO (GitHub Secret) — recipient address
+
+  For Slack delivery:
+    - SLACK_WEBHOOK_URL (GitHub Secret) — Slack incoming webhook URL
+
+================================================================================
+END OF TOOLS DOCUMENTATION (updated)
+================================================================================

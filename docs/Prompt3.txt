@@ -1,0 +1,27 @@
+One architectural point I would specifically ask Claude to review
+
+The topic column alone is probably not enough for this particular research system.
+
+Because your project is longitudinal, I would ask Claude to consider whether the knowledge model also needs a lightweight concept of:
+
+topic
+entity
+status
+event_date
+source_url
+source_type
+last_verified_at
+
+The critical one is entity.
+
+For example, these are all the same tracked entity:
+
+São Paulo PL 107/2023
+
+but they can generate dozens of articles and legislative events over several years.
+
+That lets the agent maintain:
+
+PL 107/2023 → introduced → committees → first vote → waiting for second vote → second vote → sanction, rather than treating each article as an independent piece of knowledge.
+
+That is what will make your weekly GitHub Action genuinely useful for the RBC project rather than simply becoming an automated news digest.

@@ -1,0 +1,101 @@
+name: RBC Topic Research Weekly
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_URL: https://hello-agent-alp-kiro.onrender.com
+      TOPIC: ${{ vars.RBC_TOPIC || 'brazil-rbc' }}
+      DELIVERY_CHANNEL: ${{ vars.DELIVERY_CHANNEL || 'email' }}
+
+    steps:
+      - name: Run research_topic
+        id: research
+        run: |
+          RESPONSE=$(curl --fail --silent --show-error \
+            -X POST "$AGENT_URL/tools/research_topic" \
+            -H "Content-Type: application/json" \
+            -d "{\"input\": {\"topic\": \"$TOPIC\"}}")
+          echo "$RESPONSE"
+          # Fail if status is "error" (partial is allowed but flagged)
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('status','error'))")
+          echo "research_status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" = "error" ]; then
+            echo "::error::research_topic returned status=error"
+            exit 1
+          fi
+          if [ "$STATUS" = "partial" ]; then
+            echo "::warning::research_topic returned status=partial — some searches or ingestions failed"
+          fi
+
+      - name: Run summarize_topic_updates
+        id: summarize
+        run: |
+          RESPONSE=$(curl --fail --silent --show-error \
+            -X POST "$AGENT_URL/tools/summarize_topic_updates" \
+            -H "Content-Type: application/json" \
+            -d "{\"input\": {\"topic\": \"$TOPIC\"}}")
+          echo "$RESPONSE"
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('status','error'))")
+          if [ "$STATUS" = "error" ]; then
+            echo "::error::summarize_topic_updates returned status=error"
+            exit 1
+          fi
+          # Extract report text for delivery
+          REPORT=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('report','NO REPORT GENERATED'))")
+          echo "REPORT<<EOF" >> "$GITHUB_ENV"
+          echo "$REPORT" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Deliver report (email via Resend)
+        if: env.DELIVERY_CHANNEL == 'email'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$REPORT_EMAIL_TO" ]; then
+            echo "::error::RESEND_API_KEY or REPORT_EMAIL_TO secret not set — cannot deliver report"
+            exit 1
+          fi
+          PAYLOAD=$(python3 -c "
+          import json, os
+          report = os.environ['REPORT']
+          to = os.environ['REPORT_EMAIL_TO']
+          print(json.dumps({
+            'from': 'Sienna RBC Agent <onboarding@resend.dev>',
+            'to': [to],
+            'subject': 'Brazilian RBC Weekly Update',
+            'text': report
+          }))
+          ")
+          RESPONSE=$(curl --fail --silent --show-error \
+            -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "$RESPONSE"
+          echo "$RESPONSE" | grep -q '"id"' || { echo "::error::Email delivery failed — no id in response"; exit 1; }
+
+      - name: Deliver report (Slack)
+        if: env.DELIVERY_CHANNEL == 'slack'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::error::SLACK_WEBHOOK_URL secret not set"
+            exit 1
+          fi
+          PAYLOAD=$(python3 -c "
+          import json, os
+          report = os.environ['REPORT']
+          print(json.dumps({'text': report}))
+          ")
+          curl --fail --silent --show-error \
+            -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"

@@ -1,0 +1,740 @@
+# BUILD SPECIFICATION
+
+## Automated Brazilian RBC Research Agent
+
+You are helping build an agent that continuously researches and monitors Brazilian Renda Básica de Cidadania (RBC) developments.
+
+The agent already has an ingestion/knowledge-base system.
+
+The next development phase is:
+
+1. Add topic tagging to ingestion.
+2. Build `research_topic`.
+3. Build `summarize_topic_updates`.
+4. Create a scheduled GitHub Action that runs the research and update-summary pipeline weekly.
+
+The goal is not merely to make a generic web-search agent.
+
+The goal is to create a **longitudinal research system** that knows what it already knows, searches for new evidence, detects changes, avoids duplicate reporting, preserves historical state, and produces a concise weekly RBC update.
+
+---
+
+# 1. TOPIC MODEL
+
+Add a topic field to `knowledge_chunks`.
+
+Minimum concept:
+
+```text
+topic
+```
+
+Recommended value for the current project:
+
+```text
+brazil-rbc
+```
+
+However, design the field so future topics can be added.
+
+Potential future examples:
+
+```text
+brazil-rbc
+cadunico-digital
+international-basic-income
+municipal-social-currency
+```
+
+Do not hard-code the system so that only RBC can ever exist.
+
+The topic should be queryable and filterable.
+
+---
+
+# 2. RESEARCH TOPIC TOOL
+
+Build:
+
+```text
+research_topic
+```
+
+Purpose:
+
+> Search the web for new information related to a specific research topic, compare it against the existing knowledge base, and ingest relevant new evidence.
+
+Conceptual input:
+
+```json
+{
+  "topic": "brazil-rbc",
+  "since": "optional date",
+  "scope": "optional",
+  "force_full_scan": false
+}
+```
+
+The implementation may use a different schema if that better fits the existing agent architecture.
+
+---
+
+# 3. RESEARCH TOPIC BEHAVIOR
+
+When `research_topic` is called for `brazil-rbc`, it should:
+
+### Step A — Load existing knowledge
+
+Retrieve existing knowledge chunks tagged:
+
+```text
+brazil-rbc
+```
+
+The agent must understand the existing state before searching.
+
+This is critical.
+
+The system should not simply search and append articles.
+
+---
+
+### Step B — Search official sources first
+
+Search priority:
+
+1. municipal government;
+2. municipal legislative chambers;
+3. Diário Oficial;
+4. state legislative assemblies;
+5. state governments;
+6. Câmara dos Deputados;
+7. Senado;
+8. Planalto;
+9. MDS / gov.br;
+10. other federal ministries/agencies;
+11. high-quality secondary sources;
+12. discovery-only sources.
+
+The agent should use secondary sources primarily to discover leads and then attempt official verification.
+
+---
+
+# 4. CORE SEARCH AREAS
+
+The research tool should cover at least these areas.
+
+## A. Active RBC legislation
+
+Search for:
+
+* Renda Básica de Cidadania;
+* Renda Básica Universal;
+* Lei 10.835/2004;
+* Renda Básica municipal;
+* Política Municipal de Renda Básica;
+* Política Estadual de Renda Básica;
+* projects of law;
+* amendments;
+* committee reports;
+* votes;
+* urgency requests;
+* hearings;
+* sanctions;
+* vetoes;
+* regulations.
+
+---
+
+## B. Maricá-inspired programs
+
+Search:
+
+* modelo Maricá;
+* inspirado em Maricá;
+* Mumbuca;
+* moeda social;
+* moeda social digital;
+* banco comunitário;
+* renda básica municipal;
+* local social currency.
+
+Known municipalities to monitor include:
+
+Niterói
+Cabo Frio
+Saquarema
+Itaboraí
+Macaé
+Porciúncula
+Iguaba Grande
+Petrópolis
+
+But do NOT limit research to this list.
+
+Discover new municipalities.
+
+---
+
+## C. São Paulo PL 107/2023
+
+This must have a dedicated monitoring query.
+
+Check:
+
+1. official legislative status;
+2. Ordem do Dia;
+3. second plenary discussion/vote;
+4. Colégio de Líderes;
+5. agenda requests;
+6. Eduardo Suplicy statements/actions;
+7. coauthor activity;
+8. President of Câmara announcements;
+9. amendments;
+10. approval/rejection;
+11. sanction/veto;
+12. regulation.
+
+Current known state:
+
+```text
+First discussion approved:
+2025-08-27
+
+Second discussion:
+not yet confirmed as approved
+```
+
+Never overwrite the historical first-vote event.
+
+---
+
+## D. São Paulo State PL 991/2025
+
+Monitor:
+
+* committee movement;
+* opinions;
+* urgency;
+* hearings;
+* amendments;
+* plenary agenda;
+* votes;
+* approval;
+* veto;
+* sanction;
+* regulation;
+* implementation.
+
+---
+
+## E. Historical proposals
+
+Maintain historical state for:
+
+* Santo Antônio do Pinhal;
+* Apiaí;
+* São Paulo PL 620/2016;
+* other discovered municipal/state RBC proposals.
+
+Do not repeatedly report historical items unless new evidence changes their status.
+
+---
+
+## F. CadÚnico / digital RBC infrastructure
+
+Track relevant developments concerning:
+
+* Cadastro Único;
+* gov.br;
+* Dataprev;
+* social-benefit digital platforms;
+* mobile app;
+* Web platform;
+* digital citizen dashboard;
+* AI assistants for social services;
+* MDS digital transformation.
+
+A particularly relevant historical item is:
+
+```text
+Fala.BR protocol: 71003.035760/2026-01
+Date answered: 26/05/2026
+Organization: MDS
+Type: Suggestion
+```
+
+The suggestion proposed a modern Web/mobile Cadastro Único platform with unified dashboard, accessibility, history/timeline, notifications, intelligent assistance and an official AI assistant.
+
+MDS said it was registered and forwarded to competent technical teams for analysis.
+
+The agent should search for subsequent official developments related to this proposal or equivalent MDS/CadÚnico digital initiatives.
+
+---
+
+# 5. CLASSIFICATION
+
+Every research result must be classified:
+
+```text
+A = True / close RBC
+B = Maricá-inspired / social-currency income
+C = Ordinary targeted social assistance
+```
+
+Do not classify by title alone.
+
+Evaluate the actual program/proposal.
+
+---
+
+# 6. CHANGE DETECTION
+
+This is the most important feature of `summarize_topic_updates`.
+
+The system must distinguish:
+
+```text
+NEW
+CHANGED
+UNCHANGED
+HISTORICAL
+UNVERIFIED
+```
+
+For example:
+
+Existing knowledge:
+
+```text
+PL 107/2023
+Status: first discussion approved
+Date: 2025-08-27
+```
+
+New search result:
+
+```text
+Official Câmara page
+Status: first discussion approved
+```
+
+Result:
+
+```text
+UNCHANGED
+```
+
+Do not report it as a new development.
+
+If the new result says:
+
+```text
+Scheduled for second discussion
+```
+
+Result:
+
+```text
+CHANGED
+```
+
+If the new result says:
+
+```text
+Second discussion approved
+```
+
+Result:
+
+```text
+CHANGED
+```
+
+The system must preserve both states:
+
+```text
+previous_status
+new_status
+```
+
+---
+
+# 7. HISTORICAL STATE
+
+Do not replace old knowledge with new knowledge.
+
+For legislative monitoring, preserve a timeline such as:
+
+```text
+2023-03-21 — PL introduced
+2024 — committee opinions
+2025-08-27 — first discussion approved
+2026-09-XX — second discussion scheduled
+...
+```
+
+This makes the database longitudinal rather than simply a collection of current articles.
+
+---
+
+# 8. DEDUPLICATION
+
+The agent must recognize duplicate reporting.
+
+For example:
+
+Five newspapers reporting the same Câmara vote should NOT become five separate "updates."
+
+Prefer the primary official source.
+
+Store secondary sources as corroborating evidence when useful.
+
+The final weekly report should normally report the event once.
+
+---
+
+# 9. EVIDENCE MODEL
+
+Every important claim should store:
+
+```text
+source_url
+source_title
+source_type
+publisher
+publication_date
+retrieved_at
+claim
+status
+topic
+entity
+category
+```
+
+Where possible also store:
+
+```text
+official_source = true/false
+```
+
+The agent should distinguish:
+
+```text
+confirmed_official
+secondary_confirmed
+unverified_lead
+```
+
+---
+
+# 10. ENTITY MODEL
+
+Where possible, normalize entities.
+
+Examples:
+
+```text
+Maricá RBC
+São Paulo PL 107/2023
+São Paulo State PL 991/2025
+Santo Antônio do Pinhal RBC
+Apiaí PL 018/2013
+CadÚnico
+MDS
+Mumbuca
+```
+
+This allows future queries such as:
+
+```text
+show all updates for PL 107/2023
+```
+
+without depending on exact wording.
+
+---
+
+# 11. `summarize_topic_updates`
+
+Build:
+
+```text
+summarize_topic_updates
+```
+
+Purpose:
+
+> Read the newly researched evidence together with the existing knowledge and produce a concise explanation of what actually changed.
+
+It should NOT simply summarize the newest search results.
+
+It must answer:
+
+1. What changed?
+2. Where?
+3. When?
+4. What was the previous status?
+5. What is the new status?
+6. Is it Category A, B or C?
+7. Is the source official?
+8. Why is this relevant to the RBC research?
+9. What should be monitored next?
+
+---
+
+# 12. WEEKLY REPORT STRUCTURE
+
+The GitHub Action should ultimately produce something similar to:
+
+```text
+BRAZILIAN RBC WEEKLY UPDATE
+Period: YYYY-MM-DD → YYYY-MM-DD
+
+NEW / SIGNIFICANT DEVELOPMENTS
+
+1. [Location] — [Program]
+Category: A/B/C
+Previous status:
+New status:
+What changed:
+Date:
+Official source:
+Why it matters:
+Next monitoring point:
+
+2. ...
+
+NO SIGNIFICANT CHANGE
+
+- PL 107/2023 — no new official movement found.
+- PL 991/2025 — no new official movement found.
+- Maricá RBC — no material program change found.
+
+WATCHLIST
+
+- PL 107/2023 — second plenary vote
+- PL 991/2025 — committee progression
+- New municipal RBC proposals
+- Maricá-inspired programs
+- CadÚnico/MDS digital developments
+
+UNVERIFIED LEADS
+
+Only include this section when there are genuinely relevant leads lacking official confirmation.
+```
+
+Do not fill the report with unchanged information merely to make it longer.
+
+---
+
+# 13. SPECIAL RULE FOR "NO CHANGE"
+
+"No change found" is a valid research result.
+
+For high-priority entities, explicitly report:
+
+```text
+No new official movement found in the sources checked during this cycle.
+```
+
+Do not say:
+
+```text
+Nothing happened.
+```
+
+because the agent cannot prove that.
+
+It can only report what it checked.
+
+---
+
+# 14. GITHUB ACTION
+
+Build a second scheduled workflow.
+
+Conceptually:
+
+```text
+weekly:
+    research_topic("brazil-rbc")
+        ↓
+    summarize_topic_updates("brazil-rbc")
+        ↓
+    deliver report
+```
+
+Use the project's existing architecture and conventions.
+
+Do not introduce unnecessary infrastructure.
+
+---
+
+# 15. DELIVERY CHANNEL
+
+The system should make the delivery mechanism configurable.
+
+For example:
+
+```text
+DELIVERY_CHANNEL=email
+```
+
+or:
+
+```text
+DELIVERY_CHANNEL=slack
+```
+
+Do not hard-code the destination.
+
+Use environment variables / GitHub Secrets for credentials and endpoints.
+
+Suggested configuration concepts:
+
+```text
+RBC_TOPIC=brazil-rbc
+RBC_RESEARCH_SCHEDULE=weekly
+RBC_DELIVERY_CHANNEL=email
+```
+
+Actual variable names may follow the existing repository conventions.
+
+---
+
+# 16. FAILURE HANDLING
+
+The workflow must not silently claim that research succeeded.
+
+If:
+
+* search fails;
+* official source is unavailable;
+* API fails;
+* rate limit occurs;
+* summarization fails;
+* delivery fails;
+
+the GitHub Action should clearly report the failure.
+
+A partial research result must be labeled as partial.
+
+---
+
+# 17. SECURITY
+
+Never put:
+
+* API keys;
+* email credentials;
+* webhook secrets;
+* tokens;
+
+inside the prompt, source code or database records.
+
+Use GitHub Secrets/environment variables.
+
+Do not expose credentials in logs.
+
+---
+
+# 18. COST / EFFICIENCY
+
+The research agent should avoid unnecessary repeated work.
+
+Use:
+
+* existing knowledge;
+* previous source URLs;
+* publication dates;
+* entity status;
+* topic tags;
+* incremental searches.
+
+A weekly research cycle should prioritize likely-new material rather than repeatedly crawling the entire historical internet.
+
+However, periodically perform broader discovery scans so that the system does not become blind to newly emerging municipalities or terminology.
+
+---
+
+# 19. IMPORTANT: DO NOT LOSE THE USER'S RESEARCH DISTINCTIONS
+
+The agent must preserve these distinctions:
+
+```text
+RBC ≠ every cash-transfer program
+
+RBC ≠ every social currency
+
+Maricá-inspired ≠ automatically universal RBC
+
+Targeted social assistance ≠ RBC
+
+Historical proposal ≠ current implementation
+
+Proposal ≠ approved law
+
+Approved law ≠ implemented program
+
+First vote ≠ second vote
+
+Secondary report ≠ official confirmation
+```
+
+These distinctions are fundamental to the project.
+
+---
+
+# 20. EXPECTED RESULT
+
+After implementation, the user should be able to run something conceptually equivalent to:
+
+```text
+research_topic("brazil-rbc")
+```
+
+and have the agent discover new evidence.
+
+Then:
+
+```text
+summarize_topic_updates("brazil-rbc")
+```
+
+should explain only what changed relative to the existing knowledge base.
+
+The weekly GitHub Action should automate both operations and deliver the resulting report.
+
+The final system should function as a **persistent RBC research monitor**, not as a one-time web-search chatbot.
+
+---
+
+# 21. BEFORE CODING
+
+Before implementing:
+
+1. Inspect the existing repository architecture.
+2. Identify the current ingestion schema.
+3. Identify `knowledge_chunks`.
+4. Identify existing tools/functions.
+5. Identify existing GitHub Actions.
+6. Identify the current persistence/database layer.
+7. Identify the existing web-search mechanism.
+8. Identify the existing notification/delivery mechanism.
+9. Reuse existing abstractions whenever possible.
+10. Do not duplicate functionality that already exists.
+
+Then propose the smallest coherent implementation plan.
+
+After implementation, provide:
+
+* files changed;
+* schema changes;
+* new tools;
+* GitHub Action changes;
+* environment variables/secrets required;
+* example tool calls;
+* example weekly output;
+* tests performed;
+* known limitations.
